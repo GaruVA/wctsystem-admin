@@ -21,8 +21,14 @@ export default function LoginPage() {
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      const response = await api.post<{ token: string }>('/auth/login', { email, password });
-      const token = response.data.token;
+      const response = await api.post<{ token: string, user: { userType: string } }>('/auth/login', { email, password });
+      const { token, user } = response.data;
+
+      if (user.userType !== 'admin') {
+        alert('Access denied. Admins only.');
+        return;
+      }
+
       localStorage.setItem('token', token);
       router.push(`/dashboard?token=${token}`);
     } catch (error) {
