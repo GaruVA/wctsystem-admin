@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## WCTSystem Admin
 
-## Getting Started
+### Repository Overview
+This repository contains the WCTSystem Admin project, written in TypeScript. It is a web application designed to help administrators manage waste disposal efficiently by providing real-time information about smart waste bins.
 
-First, run the development server:
+### Installation
+1. **Clone the repository:**
+    ```sh
+    git clone https://github.com/GaruVA/wctsystem-admin.git
+    cd wctsystem-admin
+    ```
 
-```bash
+2. **Install the dependencies:**
+    ```sh
+    npm install
+    ```
+
+### Usage
+To start the project, run:
+```sh
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
+- Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Developer Guidelines
+#### Project Structure
+- `app/`: Contains all the source code.
+  - `components/`: Reusable React components.
+  - `pages/`: Different pages of the application.
+  - `services/`: Services for API calls using Axios.
+  - `app/page.tsx`: Main entry point for the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+#### Running the Backend
+Ensure that the backend Node.js server is running. Follow the instructions in the [backend README](https://github.com/GaruVA/wctsystem-backend/blob/master/README.md).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+#### Development Setup
+1. **API Endpoints**: Define API endpoints in the backend and access them using Axios in the frontend.
+2. **Using Axios**: Axios is a promise-based HTTP client for the browser and Node.js.
+    - **Installation**: Axios is already included in the dependencies.
+    - **Usage Example**:
+      ```typescript
+      import axios from 'axios';
+      const fetchData = async () => {
+        try {
+          const response = await axios.get('http://localhost:5000/api/bins');
+          console.log(response.data);
+        } catch (error) {
+          console.error('Error fetching data:', error);
+        }
+      };
+      ```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Progress
+- The Next.js app has been initialized with some dependencies and configurations.
+```` ▋
