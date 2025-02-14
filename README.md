@@ -52,4 +52,3 @@ Ensure that the backend Node.js server is running. Follow the instructions in th
 
 ### Progress
 - The Next.js app has been initialized with some dependencies and configurations.
-```` ▋
