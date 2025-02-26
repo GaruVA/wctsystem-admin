@@ -17,18 +17,38 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
+    setLoading(true);
     try {
       const response = await api.post<{ token: string }>('/admin/login', { username, password });
       const { token } = response.data;
       localStorage.setItem('adminToken', token);
-      router.push('/dashboard');
-    } catch (err) {
-      setError('Invalid credentials. Please try again.');
+      router.push('/dashboard?tab=stats');
+    } catch (err: any) {
+      // Handle specific errors based on status code
+      if (err.response) {
+        // Handle error response from server
+        if (err.response.status === 404) {
+          setError('The requested resource could not be found. Please check your credentials or contact support.');
+        } else if (err.response.status === 500) {
+          setError('Internal server error. Please try again later.');
+        } else {
+          setError('An unexpected error occurred. Please try again.');
+        }
+      } else if (err.request) {
+        // Handle error if no response was received
+        setError('No response from the server. Please check your connection or try again later.');
+      } else {
+        // Handle other errors (e.g., network error)
+        setError('An error occurred while making the request. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -74,8 +94,9 @@ export default function LoginPage() {
             <Button
               type="submit"
               className="w-full bg-[#34A853] hover:bg-[#2D9047] text-white"
+              disabled={loading}
             >
-              Login to Admin Panel
+              {loading ? 'Logging in...' : 'Login to Admin Panel'}
             </Button>
           </CardFooter>
         </form>
