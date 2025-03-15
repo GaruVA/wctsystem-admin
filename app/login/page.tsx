@@ -2,15 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../components/ui/card";
+import { Label } from "../../components/ui/label";
 import { ShieldAlert } from 'lucide-react';
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://192.168.8.147:5000/api', // Replace with your actual base URL
+  baseURL: 'http://localhost:5000/api', // Replace with your actual base URL
 });
 
 export default function LoginPage() {
