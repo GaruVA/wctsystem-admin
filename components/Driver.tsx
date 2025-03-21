@@ -100,7 +100,7 @@ const Driver: React.FC = () => {
   // Handle delete collector
   const handleDeleteCollector = async (collectorId: string) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('adminToken');
       await api.delete(`/collector/${collectorId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -142,7 +142,7 @@ const Driver: React.FC = () => {
   const handleAssignCollector = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('adminToken');
       const response = await api.post('/collector/assign', assignData, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -256,36 +256,7 @@ const Driver: React.FC = () => {
         </div>
       )}
 
-      {/* Update Location Form */}
-      <div className="bg-white shadow-md rounded-lg p-6 mt-6">
-        <h2 className="text-xl font-semibold mb-4">Update Location</h2>
-        <form onSubmit={handleUpdateLocation} className="space-y-4">
-          <input
-            type="text"
-            name="latitude"
-            placeholder="Latitude"
-            value={locationData.latitude}
-            onChange={handleLocationChange}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-            required
-          />
-          <input
-            type="text"
-            name="longitude"
-            placeholder="Longitude"
-            value={locationData.longitude}
-            onChange={handleLocationChange}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-            required
-          />
-          <button
-            type="submit"
-            className="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600"
-          >
-            Update Location
-          </button>
-        </form>
-      </div>
+ 
 
       {/* Assign Collector to Area Form */}
       <div className="bg-white shadow-md rounded-lg p-6 mt-6">
