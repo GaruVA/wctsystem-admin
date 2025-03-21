@@ -15,7 +15,7 @@ export default function Sidebar() {
             <Link href="/dashboard?tab=bins">Bins</Link>
           </li>
           <li className="mb-4">
-            <Link href="/dashboard?tab=map">Areas</Link>
+            <Link href="/dashboard?tab=areas">Areas</Link>
           </li>
         </ul>
       </nav>

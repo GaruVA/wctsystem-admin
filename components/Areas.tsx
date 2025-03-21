@@ -28,7 +28,7 @@ interface Area {
   dump: string;
 }
 
-const MapView = () => {
+const Areas = () => {
   const [areas, setAreas] = useState<Area[]>([]);
   const [name, setName] = useState("");
   const [coordinates, setCoordinates] = useState("");
@@ -354,4 +354,4 @@ const MapView = () => {
   );
 };
 
-export default MapView;
+export default Areas;

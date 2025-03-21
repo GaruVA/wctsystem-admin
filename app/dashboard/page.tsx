@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import Dashboard from "./dashboard";
-import MapPage from "./map";
+import AreasPage from "./areas";
 import CollectorPage from "./collector";
 import BinsPage from "./bins";
 import Sidebar from "../../components/Sidebar";
@@ -16,7 +16,7 @@ export default function DashboardPage() {
       <Sidebar />
       <div className="flex-1 p-6 overflow-auto">
         {tab === "dashboard" && <Dashboard />}
-        {tab === "map" && <MapPage />}
+        {tab === "areas" && <AreasPage />}
         {tab === "collector" && <CollectorPage />}
         {tab === "bins" && <BinsPage />}
       </div>
