@@ -34,7 +34,7 @@ interface AnalyticsData {
   };
 }
 
-const Stats = () => {
+export default function Dashboard() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -116,6 +116,4 @@ const Stats = () => {
       </Card>
     </Container>
   );
-};
-
-export default Stats;
+}
