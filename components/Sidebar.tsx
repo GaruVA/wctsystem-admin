@@ -6,16 +6,16 @@ export default function Sidebar() {
       <nav>
         <ul>
           <li className="mb-4">
-            <Link href="/dashboard?tab=stats">Stats</Link>
+            <Link href="/dashboard?tab=dashboard">Dashboard</Link>
           </li>
           <li className="mb-4">
-            <Link href="dashboard?tab=driver">Driver</Link>
+            <Link href="dashboard?tab=collector">Collectors</Link>
           </li>
           <li className="mb-4">
-            <Link href="/dashboard?tab=map">Map</Link>
+            <Link href="/dashboard?tab=bins">Bins</Link>
           </li>
           <li className="mb-4">
-            <Link href="/dashboard?tab=notifications">Notifications</Link>
+            <Link href="/dashboard?tab=map">Areas</Link>
           </li>
         </ul>
       </nav>

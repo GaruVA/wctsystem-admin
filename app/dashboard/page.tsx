@@ -1,24 +1,24 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import StatsPage from "./stats";
+import Dashboard from "./dashboard";
 import MapPage from "./map";
-import NotificationsPage from "./notifications";
-import DriverPage from "./driver";
+import CollectorPage from "./collector";
+import BinsPage from "./bins";
 import Sidebar from "../../components/Sidebar";
 
 export default function DashboardPage() {
   const searchParams = useSearchParams();
-  const tab = searchParams?.get("tab") || "stats";
+  const tab = searchParams?.get("tab") || "dashboard";
 
   return (
     <div className="flex h-screen">
       <Sidebar />
       <div className="flex-1 p-6 overflow-auto">
-        {tab === "stats" && <StatsPage />}
+        {tab === "dashboard" && <Dashboard />}
         {tab === "map" && <MapPage />}
-        {tab === "notifications" && <NotificationsPage />}
-        {tab === "driver" && <DriverPage />}
+        {tab === "collector" && <CollectorPage />}
+        {tab === "bins" && <BinsPage />}
       </div>
     </div>
   );
