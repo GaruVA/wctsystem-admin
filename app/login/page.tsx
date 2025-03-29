@@ -28,7 +28,7 @@ export default function LoginPage() {
       const response = await api.post<{ token: string }>('/admin/login', { username, password });
       const { token } = response.data;
       localStorage.setItem('adminToken', token);
-      router.push('/dashboard?tab=stats');
+      router.push('/dashboard');
     } catch (err: any) {
       // Handle specific errors based on status code
       if (err.response) {

@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -24,7 +26,7 @@ interface AreaData {
   };
 }
 
-interface MapDisplayProps {
+interface BinMapProps {
   bins: Bin[];
   optimizedRoute?: [number, number][];
   fitToRoute?: boolean;
@@ -46,7 +48,7 @@ interface MapDisplayProps {
   style?: React.CSSProperties;
 }
 
-const MapDisplay: React.FC<MapDisplayProps> = ({
+const BinMap: React.FC<BinMapProps> = ({
   bins,
   optimizedRoute = [],
   fitToRoute = false,
@@ -274,4 +276,4 @@ const MapDisplay: React.FC<MapDisplayProps> = ({
   );
 };
 
-export default MapDisplay;
+export default BinMap;
