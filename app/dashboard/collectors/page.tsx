@@ -127,6 +127,13 @@ export default function CollectorsPage() {
     setIsEditModalOpen(true);
   };
   
+  // Open add collector modal with fresh form
+  const openAddModal = () => {
+    // Make sure form is reset before opening add modal
+    resetFormData();
+    setIsAddModalOpen(true);
+  };
+  
   // Open status change modal
   const openStatusModal = (collector: Collector) => {
     setSelectedCollector(collector);
@@ -326,7 +333,7 @@ export default function CollectorsPage() {
           </select>
           <button
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={openAddModal}
           >
             <UserPlus size={16} /> Add Collector
           </button>
