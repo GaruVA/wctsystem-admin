@@ -368,7 +368,6 @@ export default function CollectorsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">ID</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Name</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Username</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Email</th>
@@ -381,7 +380,6 @@ export default function CollectorsPage() {
                 <tbody>
                   {filteredCollectors.map((collector) => (
                     <tr key={collector._id} className="hover:bg-gray-50">
-                      <td className="py-3 px-4 font-medium">{collector._id.substring(0, 8)}...</td>
                       <td className="py-3 px-4">{getCollectorName(collector)}</td>
                       <td className="py-3 px-4">{collector.username}</td>
                       <td className="py-3 px-4">{collector.email}</td>
