@@ -470,59 +470,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Analytics Table */}
-      {analytics && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              <span>Area Performance</span>
-            </CardTitle>
-            <CardDescription>
-              Key metrics by collection area
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Area ID</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Utilization</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Collection Efficiency</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Service Delay (min)</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Bins</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.keys(analytics).map((areaId) => (
-                    <tr key={areaId} className="hover:bg-gray-50">
-                      <td className="py-3 px-4 font-medium">{areaId}</td>
-                      <td className="py-3 px-4 text-right">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(analytics[areaId].utilization)}`}>
-                          {analytics[areaId].utilization}%
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(analytics[areaId].collectionEfficiency)}`}>
-                          {analytics[areaId].collectionEfficiency}%
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(analytics[areaId].serviceDelay, true)}`}>
-                          {analytics[areaId].serviceDelay}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">{analytics[areaId].bins}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

@@ -21,7 +21,7 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-64 bg-gradient-to-b from-blue-900 to-blue-950 text-white h-screen p-4 shadow-xl flex flex-col">
+    <div className="w-64 bg-gradient-to-b from-blue-900 to-blue-950 text-white fixed top-0 left-0 h-screen p-4 shadow-xl flex flex-col">
       <div className="mb-8 flex items-center gap-2 px-2">
         <Trash2 size={28} className="text-blue-400" />
         <h1 className="text-xl font-semibold tracking-tight">WCT System</h1>

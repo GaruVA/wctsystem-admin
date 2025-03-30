@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import {
   Card,
   CardContent,
@@ -15,11 +16,63 @@ import {
   AreaChart,
   PieChart,
   FileBarChart,
-  Filter
+  Filter,
+  RefreshCcw
 } from "lucide-react";
+
+interface AnalyticsData {
+  [areaId: string]: {
+    utilization: number;
+    collectionEfficiency: number;
+    serviceDelay: number;
+    bins: number;
+  };
+}
+
+const api = axios.create({
+  baseURL: "http://localhost:5000/api", // Replace with your actual backend URL
+});
 
 export default function ReportsPage() {
   const [reportPeriod, setReportPeriod] = useState("This Month");
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
+
+  const fetchAnalytics = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get("/analytics/analytics", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`, // Replace with your actual token
+        },
+      });
+      setAnalytics(response.data as AnalyticsData);
+      setError(null);
+    } catch (err: any) {
+      setError("Failed to fetch analytics data");
+      
+      // Mock data for development
+      setAnalytics({
+        "Area-001": { utilization: 78, collectionEfficiency: 92, serviceDelay: 12, bins: 34 },
+        "Area-002": { utilization: 65, collectionEfficiency: 87, serviceDelay: 18, bins: 28 },
+        "Area-003": { utilization: 83, collectionEfficiency: 95, serviceDelay: 8, bins: 42 }
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (value: number, isDelay = false) => {
+    if (isDelay) {
+      return value < 10 ? 'text-green-500' : value < 20 ? 'text-amber-500' : 'text-red-500';
+    }
+    return value > 80 ? 'text-green-500' : value > 60 ? 'text-amber-500' : 'text-red-500';
+  };
 
   const reports = [
     {
@@ -188,6 +241,48 @@ export default function ReportsPage() {
               </tbody>
             </table>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AreaChart className="h-5 w-5" />
+            <span>Area Performance</span>
+          </CardTitle>
+          <CardDescription>
+            Performance metrics for each area
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading && <p className="text-gray-500">Loading...</p>}
+          {error && <p className="text-red-500">{error}</p>}
+          {analytics && (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Area</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Utilization</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Collection Efficiency</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Service Delay</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Bins</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(analytics).map(([areaId, data]) => (
+                    <tr key={areaId} className="hover:bg-gray-50">
+                      <td className="py-3 px-4 font-medium">{areaId}</td>
+                      <td className={`py-3 px-4 ${getStatusColor(data.utilization)}`}>{data.utilization}%</td>
+                      <td className={`py-3 px-4 ${getStatusColor(data.collectionEfficiency)}`}>{data.collectionEfficiency}%</td>
+                      <td className={`py-3 px-4 ${getStatusColor(data.serviceDelay, true)}`}>{data.serviceDelay} min</td>
+                      <td className="py-3 px-4">{data.bins}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
