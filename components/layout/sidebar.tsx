@@ -48,7 +48,7 @@ export default function Sidebar() {
               }`}
             >
               <Route size={20} />
-              <span>Schedule & Routes</span>
+              <span>Route Scheduling</span>
             </Link>
           </li>
           <li className="mb-2">
