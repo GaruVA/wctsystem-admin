@@ -143,3 +143,40 @@ export async function getAllSchedules(): Promise<any[]> {
     throw error;
   }
 }
+
+/**
+ * Adjust an existing route by adding/removing bins or reordering them
+ */
+export async function adjustExistingRoute(
+  areaId: string,
+  existingRoute: any,
+  includeBins: string[] = [],
+  excludeBins: string[] = [],
+  binOrder: string[] = []
+): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/route-optimization/adjust-existing`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+      },
+      body: JSON.stringify({
+        areaId,
+        existingRoute,
+        includeBins,
+        excludeBins,
+        binOrder
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to adjust route: ${response.status} ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error adjusting route:', error);
+    throw error;
+  }
+}

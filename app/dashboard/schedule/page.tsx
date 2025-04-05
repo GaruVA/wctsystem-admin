@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -13,8 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { 
   Route, Calendar, Clock, Truck, Filter, 
-  MapPin, Save, AlertCircle, Trash, PlusCircle, 
-  MinusCircle, CheckCircle 
+  MapPin, Save, AlertCircle, Trash, Trash2, PlusCircle, 
+  MinusCircle, CheckCircle, MoveVertical, Grid, Plus
 } from "lucide-react";
 import BinMap from "@/components/dashboard/bin-map";
 import { getAllAreasWithBins, AreaWithBins, Bin } from "@/lib/api/areas";
@@ -75,6 +75,27 @@ export default function SchedulePage() {
   const [excludedBins, setExcludedBins] = useState<Set<string>>(new Set());
   const [fillLevelThreshold, setFillLevelThreshold] = useState<number>(70);
   const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
+  const [currentDate, setCurrentDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+
+  // Adding state for route adjustment mode
+  const [isAdjustmentMode, setIsAdjustmentMode] = useState<boolean>(false);
+  const [originalRoute, setOriginalRoute] = useState<any>(null);
+  const [modifiedRoute, setModifiedRoute] = useState<any>(null);
+
+  // State for route bin table
+  const [routeBins, setRouteBins] = useState<Array<{bin: Bin, index: number}>>([]);
+  const [draggedBinIndex, setDraggedBinIndex] = useState<number | null>(null);
+  const [manualCoordinate, setManualCoordinate] = useState<{lat: string, lng: string}>({lat: '', lng: ''});
+  const [manualCoordinateError, setManualCoordinateError] = useState<string | null>(null);
+
+  // State for collectors
+  const [collectors, setCollectors] = useState<Collector[]>([]);
+  const [selectedCollector, setSelectedCollector] = useState<string>("");
+  const [isLoadingCollectors, setIsLoadingCollectors] = useState<boolean>(false);
+
+  // Define route statistics state
   const [routeStats, setRouteStats] = useState<{
     distance: string;
     duration: string;
@@ -84,53 +105,42 @@ export default function SchedulePage() {
     duration: "0 min",
     binCount: 0,
   });
-  const [currentDate, setCurrentDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
 
-  // State for collectors
-  const [collectors, setCollectors] = useState<Collector[]>([]);
-  const [selectedCollector, setSelectedCollector] = useState<string>("");
-  const [isLoadingCollectors, setIsLoadingCollectors] = useState<boolean>(false);
-
-  // Fetch schedules when component mounts
-  useEffect(() => {
-    const fetchSchedules = async () => {
-      setIsLoadingSchedules(true);
-      try {
-        // Call our API to get real schedules
-        const response = await fetch(`${API_BASE_URL}/schedules`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch schedules: ${response.status}`);
+  // Function to refresh the schedules list
+  const refreshSchedules = async () => {
+    setIsLoadingSchedules(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/schedules`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         }
-        
-        const data = await response.json();
-        
-        // Map API response to our component's schedule format
-        const formattedSchedules = data.data.map((schedule: any) => ({
-          id: schedule._id,
-          name: schedule.name,
-          areaId: schedule.areaId?._id || schedule.areaId,
-          areaName: schedule.areaId?.name || 'Unknown Area',
-          collectorId: schedule.collectorId?._id || schedule.collectorId || '',
-          collectorName: schedule.collectorId 
-            ? `${schedule.collectorId.firstName} ${schedule.collectorId.lastName}` 
-            : 'Unassigned',
-          startTime: schedule.startTime || new Date(schedule.date).toISOString(),
-          endTime: schedule.endTime || '',
-          status: schedule.status,
-          bins: schedule.route.includedBins?.length || 0
-        }));
-        
-        setSchedules(formattedSchedules);
-      } catch (error) {
-        console.error('Error fetching schedules:', error);
-        // Fallback to mock data if API call fails
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch schedules: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      const formattedSchedules = data.data.map((schedule: any) => ({
+        id: schedule._id,
+        name: schedule.name,
+        areaId: schedule.areaId?._id || schedule.areaId,
+        areaName: schedule.areaId?.name || 'Unknown Area',
+        collectorId: schedule.collectorId?._id || schedule.collectorId || '',
+        collectorName: schedule.collectorId 
+          ? `${schedule.collectorId.firstName} ${schedule.collectorId.lastName}` 
+          : 'Unassigned',
+        startTime: schedule.startTime || new Date(schedule.date).toISOString(),
+        endTime: schedule.endTime || '',
+        status: schedule.status,
+        bins: schedule.route.includedBins?.length || 0
+      }));
+      
+      setSchedules(formattedSchedules);
+    } catch (error) {
+      console.error('Error fetching schedules:', error);
+      if (process.env.NODE_ENV !== 'production') {
         setSchedules([
           {
             id: "SCH001",
@@ -157,13 +167,16 @@ export default function SchedulePage() {
             bins: 28
           }
         ]);
-      } finally {
-        setIsLoadingSchedules(false);
       }
-    };
+    } finally {
+      setIsLoadingSchedules(false);
+    }
+  };
 
+  // Fetch schedules when component mounts
+  useEffect(() => {
     if (activeTab === 'schedules') {
-      fetchSchedules();
+      refreshSchedules();
     }
   }, [activeTab]);
 
@@ -173,7 +186,6 @@ export default function SchedulePage() {
       try {
         const areasData = await getAllAreasWithBins();
         setAreas(areasData);
-        // Select the first area by default
         if (areasData.length > 0) {
           setSelectedArea(areasData[0]);
         }
@@ -206,41 +218,461 @@ export default function SchedulePage() {
   const handleAreaChange = (areaId: string) => {
     const area = areas.find((a) => a.areaID === areaId);
     setSelectedArea(area || null);
-    // Reset route and selections when changing areas
     setOptimizedRoute(null);
     setSelectedBins(new Set());
     setExcludedBins(new Set());
     setSelectedBin(null);
   };
 
-  // Generate route based on selected area and options
-  const generateRoute = async () => {
-    if (!selectedArea) return;
+  // Update route bins when optimized route changes
+  useEffect(() => {
+    if (optimizedRoute && selectedArea) {
+      // Map bin objects to route sequence
+      const binMap = new Map<string, Bin>();
+      selectedArea.bins.forEach(bin => {
+        binMap.set(bin._id, bin);
+      });
+      
+      // Create array of bin objects in route order
+      let newRouteBins: Array<{bin: Bin, index: number}> = [];
+      
+      // Handle route from API response (typically has includedBins array)
+      if (originalRoute?.includedBins && Array.isArray(originalRoute.includedBins)) {
+        console.log('Using included bins from original route');
+        // Use the bins from the includedBins array
+        
+        const includedBinIds = originalRoute.includedBins;
+        
+        // Filter out any excluded bins from the current state
+        const filteredBinIds = includedBinIds.filter((id: string) => !excludedBins.has(id));
+        
+        // Build the route bins from the filtered list
+        filteredBinIds.forEach((binId: string, index: number) => {
+          // Find the bin in the area
+          const bin = selectedArea.bins.find(b => b._id === binId);
+          if (bin) {
+            newRouteBins.push({
+              bin,
+              index
+            });
+          }
+        });
+        
+        // Add any manually selected bins that weren't in the original route
+        selectedBins.forEach((binId: string) => {
+          // Check if it's a waypoint (custom added point)
+          if (binId.startsWith('waypoint-')) {
+            // Find this waypoint in the current routeBins
+            const waypointBin = routeBins.find(rb => rb.bin._id === binId)?.bin;
+            if (waypointBin) {
+              newRouteBins.push({
+                bin: waypointBin,
+                index: newRouteBins.length
+              });
+            }
+          } 
+          // Or if it's a regular bin not already in the list
+          else if (!filteredBinIds.includes(binId)) {
+            const bin = selectedArea.bins.find(b => b._id === binId);
+            if (bin) {
+              newRouteBins.push({
+                bin,
+                index: newRouteBins.length
+              });
+            }
+          }
+        });
+      }
+      // Use stops_sequence from optimized route if available
+      else if (optimizedRoute.stops_sequence) {
+        console.log('Using stops_sequence from optimized route');
+        optimizedRoute.stops_sequence.forEach((binIndex, routeIndex) => {
+          // Check if index is valid for the area bins array
+          if (binIndex >= 0 && binIndex < selectedArea.bins.length) {
+            const bin = selectedArea.bins[binIndex];
+            // Only add the bin if it's not in the excludedBins set
+            if (!excludedBins.has(bin._id)) {
+              newRouteBins.push({
+                bin,
+                index: routeIndex
+              });
+            }
+          }
+        });
+        
+        // Add any custom waypoints from selectedBins
+        selectedBins.forEach(binId => {
+          if (binId.startsWith('waypoint-')) {
+            // Find this waypoint in the current routeBins
+            const waypointBin = routeBins.find(rb => rb.bin._id === binId)?.bin;
+            if (waypointBin) {
+              newRouteBins.push({
+                bin: waypointBin,
+                index: newRouteBins.length
+              });
+            }
+          }
+        });
+      } 
+      // Default to using bins from the area based on fill level threshold
+      else {
+        console.log('Using default bin selection based on fill level');
+        selectedArea.bins
+          .filter(bin => {
+            // Include bin if:
+            // 1. It's explicitly selected, or
+            // 2. It meets the threshold and is not explicitly excluded
+            return (
+              selectedBins.has(bin._id) || 
+              (bin.fillLevel >= fillLevelThreshold && !excludedBins.has(bin._id))
+            );
+          })
+          .forEach((bin, index) => {
+            newRouteBins.push({
+              bin,
+              index
+            });
+          });
+      }
+      
+      // Sort by index to maintain proper order
+      newRouteBins.sort((a, b) => a.index - b.index);
+      
+      // Re-index to ensure consecutive ordering
+      newRouteBins.forEach((item, idx) => {
+        item.index = idx;
+      });
+      
+      console.log(`Updated route waypoints: ${newRouteBins.length} bins`);
+      setRouteBins(newRouteBins);
+    } else {
+      setRouteBins([]);
+    }
+  }, [optimizedRoute, selectedArea, excludedBins, fillLevelThreshold, selectedBins, originalRoute]);
 
+  // Handle bin drag start
+  const handleDragStart = (index: number) => {
+    setDraggedBinIndex(index);
+  };
+
+  // Handle bin drag over
+  const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>, index: number) => {
+    e.preventDefault();
+    if (draggedBinIndex === null || draggedBinIndex === index) return;
+    
+    const newBins = [...routeBins];
+    const movedBin = newBins[draggedBinIndex];
+    newBins.splice(draggedBinIndex, 1);
+    newBins.splice(index, 0, movedBin);
+    
+    newBins.forEach((bin, idx) => {
+      bin.index = idx;
+    });
+    
+    setRouteBins(newBins);
+    setDraggedBinIndex(index);
+    
+    if (!isAdjustmentMode) {
+      setIsAdjustmentMode(true);
+    }
+  };
+
+  // Handle bin drag end
+  const handleDragEnd = () => {
+    setDraggedBinIndex(null);
+    const binIds = routeBins.map(routeBin => routeBin.bin._id);
+    adjustRoute();
+  };
+
+  // Handle excluding a bin from the route
+  const handleExcludeBin = (binId: string) => {
+    setExcludedBins(new Set(excludedBins).add(binId));
+    
+    if (selectedBins.has(binId)) {
+      const newSelected = new Set(selectedBins);
+      newSelected.delete(binId);
+      setSelectedBins(newSelected);
+    }
+    
+    setRouteBins(routeBins.filter(routeBin => routeBin.bin._id !== binId));
+    
+    if (!isAdjustmentMode) {
+      setIsAdjustmentMode(true);
+    }
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'Never';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  // Add manual coordinate as waypoint
+  const addManualWaypoint = () => {
+    try {
+      setManualCoordinateError(null);
+      const lat = parseFloat(manualCoordinate.lat);
+      const lng = parseFloat(manualCoordinate.lng);
+      
+      if (isNaN(lat) || isNaN(lng)) {
+        setManualCoordinateError("Please enter valid numbers");
+        return;
+      }
+      
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        setManualCoordinateError("Coordinates out of valid range");
+        return;
+      }
+      
+      const waypoint: Bin = {
+        _id: `waypoint-${Date.now()}`,
+        location: {
+          type: "Point",
+          coordinates: [lng, lat]
+        },
+        fillLevel: 100,
+        lastCollected: new Date().toISOString(),
+        address: `Custom waypoint (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+      };
+      
+      setRouteBins([...routeBins, {
+        bin: waypoint,
+        index: routeBins.length
+      }]);
+      
+      setSelectedBins(new Set(selectedBins).add(waypoint._id));
+      
+      setManualCoordinate({lat: '', lng: ''});
+      
+      if (!isAdjustmentMode) {
+        setIsAdjustmentMode(true);
+      }
+    } catch (error) {
+      console.error("Error adding manual waypoint:", error);
+      setManualCoordinateError("Invalid coordinates");
+    }
+  };
+
+  // Helper function to get the status badge class
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return 'bg-blue-100 text-blue-800';
+      case 'in-progress':
+        return 'bg-amber-100 text-amber-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Toggle bin selection for include/exclude
+  const toggleBinSelection = (bin: Bin) => {
+    const binId = bin._id;
+    
+    // If bin is already excluded, remove from excluded and potentially add to selected
+    if (excludedBins.has(binId)) {
+      const newExcluded = new Set(excludedBins);
+      newExcluded.delete(binId);
+      setExcludedBins(newExcluded);
+      
+      // Only add to selected if it wouldn't be included by default (below threshold)
+      if (bin.fillLevel < fillLevelThreshold) {
+        const newSelected = new Set(selectedBins);
+        newSelected.add(binId);
+        setSelectedBins(newSelected);
+      }
+    }
+    // If bin is already specifically selected, remove it from selected (will be excluded if below threshold)
+    else if (selectedBins.has(binId)) {
+      const newSelected = new Set(selectedBins);
+      newSelected.delete(binId);
+      setSelectedBins(newSelected);
+      
+      // Exclude the bin if it's below the threshold
+      if (bin.fillLevel < fillLevelThreshold) {
+        const newExcluded = new Set(excludedBins);
+        newExcluded.add(binId);
+        setExcludedBins(newExcluded);
+      }
+    }
+    // Otherwise, toggle between included and excluded based on fill level
+    else {
+      if (bin.fillLevel >= fillLevelThreshold) {
+        // Bin would be included by default, so we exclude it
+        const newExcluded = new Set(excludedBins);
+        newExcluded.add(binId);
+        setExcludedBins(newExcluded);
+      } else {
+        // Bin would be excluded by default, so we include it
+        const newSelected = new Set(selectedBins);
+        newSelected.add(binId);
+        setSelectedBins(newSelected);
+      }
+    }
+    
+    // Set adjustment mode flag
+    if (!isAdjustmentMode) {
+      setIsAdjustmentMode(true);
+    }
+  };
+
+  // Apply route adjustments
+  const adjustRoute = async () => {
+    if (!selectedArea || !originalRoute) return;
+    
     setIsLoadingRoute(true);
     try {
-      // Get all bins in the selected area
-      const allBins = selectedArea.bins || [];
+      // Prepare the bin order
+      const binOrder = routeBins.map(routeBin => routeBin.bin._id);
       
-      // Default is to include bins based on threshold
-      // The includeIds will override threshold for bins we specifically want to include
-      // The excludeIds will exclude bins even if they meet the threshold
-      const options = {
-        includeIds: Array.from(selectedBins),
-        excludeIds: Array.from(excludedBins),
-        fillLevelThreshold
-      };
-
-      console.log("Route options:", options);
-
-      const optimizedRouteData = await getOptimizedRoute(selectedArea.areaID, options);
-      setOptimizedRoute(optimizedRouteData.route);
+      // Prepare arrays of included and excluded bin IDs
+      const includeBins = Array.from(selectedBins);
+      const excludeBins = Array.from(excludedBins);
+      
+      // Call the API to adjust the route
+      const response = await fetch(`${API_BASE_URL}/route-optimization/adjust-existing`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify({
+          areaId: selectedArea.areaID,
+          existingRoute: originalRoute,
+          includeBins,
+          excludeBins,
+          binOrder
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to adjust route: ${response.status}`);
+      }
+      
+      const adjustedData = await response.json();
+      
+      // Update the route and related state
+      setOptimizedRoute(adjustedData.route);
+      setModifiedRoute(adjustedData);
       
       // Update route stats
       setRouteStats({
+        distance: adjustedData.route.distance,
+        duration: adjustedData.route.duration,
+        binCount: adjustedData.totalBins || 0,
+      });
+      
+    } catch (error) {
+      console.error('Error adjusting route:', error);
+      alert('Failed to adjust route. Please try again.');
+    } finally {
+      setIsLoadingRoute(false);
+    }
+  };
+
+  // Reset to original route
+  const resetAdjustments = () => {
+    if (!originalRoute) return;
+    
+    // Reset selections
+    setSelectedBins(new Set());
+    setExcludedBins(new Set());
+    setSelectedBin(null);
+    setIsAdjustmentMode(false);
+    
+    // Restore original route
+    setOptimizedRoute(originalRoute.route);
+    setModifiedRoute(null);
+    
+    // Update route stats
+    setRouteStats({
+      distance: originalRoute.route.distance,
+      duration: originalRoute.route.duration,
+      binCount: originalRoute.totalBins || 0,
+    });
+  };
+
+  // Save route to schedule
+  const saveRoute = async () => {
+    if (!optimizedRoute || !selectedArea || !currentDate || !routeName) {
+      alert('Please provide all required information: route name, area, and date.');
+      return;
+    }
+    
+    try {
+      const routeData = {
+        name: routeName,
+        areaId: selectedArea.areaID,
+        date: currentDate,
+        collectorId: selectedCollector || undefined,
+        route: modifiedRoute || originalRoute
+      };
+      
+      const response = await saveRouteSchedule(routeData);
+      
+      if (response.success) {
+        alert('Route schedule saved successfully!');
+        // Reset form
+        setRouteName('');
+        setSelectedBins(new Set());
+        setExcludedBins(new Set());
+        setOptimizedRoute(null);
+        setOriginalRoute(null);
+        setModifiedRoute(null);
+        setIsAdjustmentMode(false);
+        
+        // Switch to schedules tab
+        setActiveTab('schedules');
+        refreshSchedules();
+      } else {
+        alert(`Failed to save route schedule: ${response.message}`);
+      }
+    } catch (error) {
+      console.error('Error saving route schedule:', error);
+      alert('Failed to save route schedule. Please try again.');
+    }
+  };
+
+  // Generate the initial optimized route
+  const generateRoute = async () => {
+    if (!selectedArea) return;
+
+    setIsAdjustmentMode(false);
+    setSelectedBins(new Set());
+    setExcludedBins(new Set());
+    setSelectedBin(null);
+    
+    setIsLoadingRoute(true);
+    try {
+      const options = {
+        fillLevelThreshold,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/route-optimization/area/${selectedArea.areaID}`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate route: ${response.status}`);
+      }
+
+      const optimizedRouteData = await response.json();
+      
+      setOriginalRoute(optimizedRouteData);
+      setModifiedRoute(null);
+      setOptimizedRoute(optimizedRouteData.route);
+
+      setRouteStats({
         distance: optimizedRouteData.route.distance,
         duration: optimizedRouteData.route.duration,
-        binCount: optimizedRouteData.totalBins || 0
+        binCount: optimizedRouteData.totalBins || 0,
       });
     } catch (error) {
       console.error("Error generating route:", error);
@@ -250,173 +682,9 @@ export default function SchedulePage() {
     }
   };
 
-  // Refresh schedules after saving a new one
-  const refreshSchedules = () => {
-    if (activeTab === 'schedules') {
-      // Fetch schedules again
-      const fetchSchedules = async () => {
-        setIsLoadingSchedules(true);
-        try {
-          const response = await fetch(`${API_BASE_URL}/schedules`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('adminToken') || ''}`
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Failed to fetch schedules: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          
-          const formattedSchedules = data.data.map((schedule: any) => ({
-            id: schedule._id,
-            name: schedule.name,
-            areaId: schedule.areaId?._id || schedule.areaId,
-            areaName: schedule.areaId?.name || 'Unknown Area',
-            collectorId: schedule.collectorId?._id || schedule.collectorId || '',
-            collectorName: schedule.collectorId 
-              ? `${schedule.collectorId.firstName} ${schedule.collectorId.lastName}` 
-              : 'Unassigned',
-            startTime: schedule.startTime || new Date(schedule.date).toISOString(),
-            endTime: schedule.endTime || '',
-            status: schedule.status,
-            bins: schedule.route.includedBins?.length || 0
-          }));
-          
-          setSchedules(formattedSchedules);
-        } catch (error) {
-          console.error('Error refreshing schedules:', error);
-        } finally {
-          setIsLoadingSchedules(false);
-        }
-      };
-
-      fetchSchedules();
-    }
-  };
-
-  // Save the current route as a schedule
-  const saveRoute = async () => {
-    if (!selectedArea || !optimizedRoute || !routeName.trim()) {
-      alert("Please generate a route and provide a name before saving.");
-      return;
-    }
-
-    try {
-      // Create a schedule data object
-      const scheduleData = {
-        name: routeName,
-        areaId: selectedArea.areaID,
-        collectorId: selectedCollector || undefined, // Include collector if selected
-        date: currentDate,
-        route: {
-          coordinates: optimizedRoute.route,
-          distance: optimizedRoute.distance,
-          duration: optimizedRoute.duration,
-          includedBins: Array.from(selectedBins),
-          excludedBins: Array.from(excludedBins),
-          fillLevelThreshold
-        },
-        status: "scheduled"
-      };
-
-      console.log("Saving schedule with data:", scheduleData);
-
-      // Save the schedule
-      await saveRouteSchedule(scheduleData);
-      
-      // Reset form
-      setRouteName("");
-      setSelectedCollector("");
-      setOptimizedRoute(null);
-      setSelectedBins(new Set());
-      setExcludedBins(new Set());
-      
-      // Switch to schedules tab and refresh the list
-      setActiveTab('schedules');
-      refreshSchedules();
-      
-      alert("Route schedule saved successfully!");
-    } catch (error) {
-      console.error("Error saving route:", error);
-      alert("Failed to save route schedule. Please try again.");
-    }
-  };
-
-  // Handle bin selection/exclusion
-  const toggleBinSelection = (bin: Bin) => {
-    const binId = bin._id;
-    
-    // If the bin is already selected, remove it
-    if (selectedBins.has(binId)) {
-      const newSelected = new Set(selectedBins);
-      newSelected.delete(binId);
-      setSelectedBins(newSelected);
-      return;
-    }
-    
-    // If the bin is excluded, un-exclude it
-    if (excludedBins.has(binId)) {
-      const newExcluded = new Set(excludedBins);
-      newExcluded.delete(binId);
-      setExcludedBins(newExcluded);
-      return;
-    }
-    
-    // Otherwise, add it to selected bins
-    setSelectedBins(new Set(selectedBins).add(binId));
-  };
-
-  // Handle bin exclusion
-  const toggleBinExclusion = (bin: Bin) => {
-    const binId = bin._id;
-    
-    // If the bin is already excluded, remove it
-    if (excludedBins.has(binId)) {
-      const newExcluded = new Set(excludedBins);
-      newExcluded.delete(binId);
-      setExcludedBins(newExcluded);
-      return;
-    }
-    
-    // If the bin is selected, un-select it
-    if (selectedBins.has(binId)) {
-      const newSelected = new Set(selectedBins);
-      newSelected.delete(binId);
-      setSelectedBins(newSelected);
-    }
-    
-    // Add to excluded bins
-    setExcludedBins(new Set(excludedBins).add(binId));
-  };
-
-  const getBinStatus = (bin: Bin) => {
-    const binId = bin._id;
-    if (selectedBins.has(binId)) return "selected";
-    if (excludedBins.has(binId)) return "excluded";
-    if (bin.fillLevel >= fillLevelThreshold) return "included";
-    return "normal";
-  };
-
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case "scheduled":
-        return "bg-blue-100 text-blue-800";
-      case "in-progress":
-        return "bg-amber-100 text-amber-800";
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Double click on bin to toggle selection
+  const handleBinDoubleClick = (bin: Bin) => {
+    toggleBinSelection(bin);
   };
 
   const emptyRoute = !optimizedRoute || optimizedRoute.route.length === 0;
@@ -666,68 +934,57 @@ export default function SchedulePage() {
               </Card>
             )}
 
-            {/* Selected Bin Information */}
-            {selectedBin && (
+            {/* Add Custom Waypoint */}
+            {!emptyRoute && (
               <Card className="shadow-md">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2 text-gray-800">
-                    <MapPin size={16} className="text-blue-600" /> 
-                    Selected Bin
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-800">
+                    <Plus className="h-5 w-5 text-blue-600" /> 
+                    Add Waypoint
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Fill Level:</span>
-                    <span className="font-medium text-gray-800">{selectedBin.fillLevel}%</span>
-                  </div>
-                  {selectedBin.address && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Address:</span>
-                      <span className="font-medium max-w-[200px] text-right text-gray-800">{selectedBin.address}</span>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor="latitude" className="text-sm font-medium text-gray-700">Latitude</Label>
+                        <Input
+                          id="latitude"
+                          placeholder="e.g. 6.9271"
+                          value={manualCoordinate.lat}
+                          onChange={(e) => setManualCoordinate({...manualCoordinate, lat: e.target.value})}
+                          className="border-gray-300 shadow-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="longitude" className="text-sm font-medium text-gray-700">Longitude</Label>
+                        <Input
+                          id="longitude"
+                          placeholder="e.g. 79.8612"
+                          value={manualCoordinate.lng}
+                          onChange={(e) => setManualCoordinate({...manualCoordinate, lng: e.target.value})}
+                          className="border-gray-300 shadow-sm"
+                        />
+                      </div>
                     </div>
-                  )}
-                  {selectedBin.lastCollected && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Last Collected:</span>
-                      <span className="font-medium text-gray-800">
-                        {new Date(selectedBin.lastCollected).toLocaleDateString()}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
+                    
+                    {manualCoordinateError && (
+                      <p className="text-xs text-red-600">{manualCoordinateError}</p>
+                    )}
+                    
                     <Button
-                      variant="outline"
+                      className="w-full"
                       size="sm"
-                      className="flex-1 text-xs border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-100"
-                      onClick={() => toggleBinSelection(selectedBin)}
+                      onClick={addManualWaypoint}
                     >
-                      {selectedBins.has(selectedBin._id) ? (
-                        <>
-                          <MinusCircle size={14} className="mr-1" /> Remove
-                        </>
-                      ) : (
-                        <>
-                          <PlusCircle size={14} className="mr-1" /> Include
-                        </>
-                      )}
+                      <PlusCircle className="mr-2 h-4 w-4" /> 
+                      Add to Route
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-100"
-                      onClick={() => toggleBinExclusion(selectedBin)}
-                    >
-                      {excludedBins.has(selectedBin._id) ? (
-                        <>
-                          <CheckCircle size={14} className="mr-1" /> Un-exclude
-                        </>
-                      ) : (
-                        <>
-                          <Trash size={14} className="mr-1" /> Exclude
-                        </>
-                      )}
-                    </Button>
+                    
+                    <p className="text-xs text-gray-500 mt-1">
+                      <AlertCircle className="inline-block h-3 w-3 mr-1" />
+                      Double-click on the map to add bins too
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -737,13 +994,14 @@ export default function SchedulePage() {
           {/* Right Column - Map */}
           <div className="lg:col-span-2 space-y-4">
             <div className="bg-white p-4 rounded-lg shadow-md">
-              <div className="h-[700px]">
+              <div className="h-[500px]">
                 {selectedArea && (
                   <BinMap
                     singleArea={selectedArea}
                     optimizedRoute={optimizedRoute?.route || []}
                     fitToRoute={!emptyRoute}
                     onBinSelect={setSelectedBin}
+                    onBinDoubleClick={handleBinDoubleClick}
                     selectedBin={selectedBin}
                     style={{ height: '100%', borderRadius: '0.375rem' }}
                   />
@@ -765,12 +1023,202 @@ export default function SchedulePage() {
                   </div>
                 </div>
                 <div>
-                  <span className="text-xs text-gray-500">Click on bins to include or exclude them manually</span>
+                  <span className="text-xs text-gray-500">Double-click on bins to include or exclude them</span>
                 </div>
               </div>
             </div>
+            
+            {/* Route Bin Table */}
+            {!emptyRoute && (
+              <Card className="shadow-md">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-lg font-semibold text-gray-800">
+                      <MoveVertical size={18} className="text-blue-600" /> 
+                      Route Waypoints
+                    </div>
+                    {isAdjustmentMode && (
+                      <span className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full">
+                        Custom Order
+                      </span>
+                    )}
+                  </CardTitle>
+                  <CardDescription className="text-sm text-gray-600">
+                    Drag and drop to reorder. Remove unwanted waypoints.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-left">
+                          <th className="p-2">#</th>
+                          <th className="p-2">Type</th>
+                          <th className="p-2">Fill Level</th>
+                          <th className="p-2">Last Collected</th>
+                          <th className="p-2">Coordinates</th>
+                          <th className="p-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {routeBins.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-4 text-center text-gray-500">
+                              No bins in route
+                            </td>
+                          </tr>
+                        ) : (
+                          routeBins.map((routeBin, index) => (
+                            <tr 
+                              key={`${routeBin.bin._id}-${index}`}
+                              draggable
+                              onDragStart={() => handleDragStart(index)}
+                              onDragOver={(e) => handleDragOver(e, index)}
+                              onDragEnd={handleDragEnd}
+                              className={`border-b border-gray-100 hover:bg-gray-50 cursor-grab ${
+                                draggedBinIndex === index ? 'opacity-50 bg-blue-50' : ''
+                              }`}
+                            >
+                              <td className="p-2 font-medium">{index + 1}</td>
+                              <td className="p-2">
+                                {routeBin.bin._id.startsWith('waypoint') ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                    Waypoint
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                    Bin
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-2">
+                                <div className="flex items-center">
+                                  <div 
+                                    className="h-2 w-12 rounded-full bg-gray-200 overflow-hidden mr-2"
+                                  >
+                                    <div 
+                                      className={`h-full ${
+                                        routeBin.bin.fillLevel >= 80 ? 'bg-red-500' :
+                                        routeBin.bin.fillLevel >= 50 ? 'bg-amber-500' : 'bg-green-500'
+                                      }`}
+                                      style={{ width: `${routeBin.bin.fillLevel}%` }}
+                                    ></div>
+                                  </div>
+                                  <span>{routeBin.bin.fillLevel}%</span>
+                                </div>
+                              </td>
+                              <td className="p-2">{formatDate(routeBin.bin.lastCollected)}</td>
+                              <td className="p-2">
+                                <span className="text-xs">
+                                  {routeBin.bin.location.coordinates[1].toFixed(4)}, {routeBin.bin.location.coordinates[0].toFixed(4)}
+                                </span>
+                              </td>
+                              <td className="p-2 text-right">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleExcludeBin(routeBin.bin._id)}
+                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
+      )}
+
+      {/* Route Adjustment Controls - Only shown when a route exists */}
+      {!emptyRoute && (
+        <Card className={`shadow-md ${isAdjustmentMode ? 'border-2 border-amber-400' : ''}`}>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-lg font-semibold text-gray-800">
+                <Filter size={18} className="text-amber-600" /> 
+                Route Adjustments
+              </div>
+              {isAdjustmentMode && (
+                <span className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full">
+                  Adjustment Mode
+                </span>
+              )}
+            </CardTitle>
+            <CardDescription className="text-sm text-gray-600">
+              {isAdjustmentMode 
+                ? "You've modified the original route. Click Apply to update the route." 
+                : "Use the table above to reorder stops or remove waypoints."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2 text-sm">
+                {selectedBins.size > 0 && (
+                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md flex items-center gap-1">
+                    <PlusCircle size={14} />
+                    {selectedBins.size} waypoint{selectedBins.size !== 1 ? 's' : ''} added
+                  </span>
+                )}
+                {excludedBins.size > 0 && (
+                  <span className="bg-red-100 text-red-800 px-2 py-1 rounded-md flex items-center gap-1">
+                    <MinusCircle size={14} />
+                    {excludedBins.size} bin{excludedBins.size !== 1 ? 's' : ''} excluded
+                  </span>
+                )}
+                {(routeBins.length > 0 && isAdjustmentMode) && (
+                  <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-md flex items-center gap-1">
+                    <MoveVertical size={14} />
+                    Custom waypoint order
+                  </span>
+                )}
+                {selectedBins.size === 0 && excludedBins.size === 0 && !isAdjustmentMode && (
+                  <span className="text-gray-500 italic">No changes to the route</span>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-amber-500 text-white rounded-md shadow-sm hover:bg-amber-600"
+                  onClick={adjustRoute}
+                  disabled={isLoadingRoute || (selectedBins.size === 0 && excludedBins.size === 0 && !isAdjustmentMode)}
+                >
+                  {isLoadingRoute ? (
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                  ) : (
+                    <Filter size={16} />
+                  )}
+                  Apply Changes
+                </Button>
+                
+                {isAdjustmentMode && (
+                  <Button
+                    variant="outline"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-100"
+                    onClick={resetAdjustments}
+                  >
+                    Reset to Original
+                  </Button>
+                )}
+              </div>
+
+              {isAdjustmentMode && (
+                <div className="mt-2 p-2 bg-amber-50 rounded-md">
+                  <p className="text-xs text-amber-700">
+                    <AlertCircle size={14} className="inline mr-1" />
+                    You can continue adjusting the route or save it as a schedule.
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

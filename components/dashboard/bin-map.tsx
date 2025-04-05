@@ -21,6 +21,7 @@ interface BinMapProps {
     longitude: number;
   };
   onBinSelect?: (bin: Bin) => void;
+  onBinDoubleClick?: (bin: Bin) => void; // Add double click handler
   selectedBin?: Bin | null;
   style?: React.CSSProperties;
   colorByArea?: boolean;
@@ -38,6 +39,7 @@ const BinMap: React.FC<BinMapProps> = ({
   fitToAreas = true,
   currentLocation,
   onBinSelect,
+  onBinDoubleClick,
   selectedBin = null,
   style,
   colorByArea = true
@@ -56,14 +58,14 @@ const BinMap: React.FC<BinMapProps> = ({
       const colors = new Map<string, string>();
       // Predefined colors for better visibility
       const colorPalette = [
-        '#3388ff', '#ff3388', '#88ff33', '#ff8833', '#33ff88', 
+        '#3388ff', '#ff3388', '#88ff33', '#ff8833', '#33ff88',
         '#8833ff', '#ff3333', '#33ff33', '#3333ff', '#ffff33'
       ];
-      
+
       areas.forEach((area, index) => {
         colors.set(area.areaID, colorPalette[index % colorPalette.length]);
       });
-      
+
       setAreaColors(colors);
     }
   }, [areas, colorByArea]);
@@ -151,10 +153,30 @@ const BinMap: React.FC<BinMapProps> = ({
         coordinates.map(coord => L.marker([coord.lat, coord.lng], { opacity: 0 }))
       );
       mapRef.current.fitBounds(group.getBounds());
-      
+
       // Remove the temporary markers used for bounds calculation
       group.eachLayer(layer => layer.remove());
     }
+  };
+
+  // Function to handle bin marker interactions
+  const addBinMarkerInteractions = (marker: L.Marker, bin: Bin) => {
+    // Handle click to select bin
+    marker.on('click', () => {
+      if (onBinSelect) {
+        onBinSelect(bin);
+      }
+    });
+    
+    // Add double click handler
+    marker.on('dblclick', (e) => {
+      // Stop propagation to prevent map zoom
+      L.DomEvent.stopPropagation(e);
+      
+      if (onBinDoubleClick) {
+        onBinDoubleClick(bin);
+      }
+    });
   };
 
   // Handle map fitting and layers based on different modes
@@ -217,21 +239,12 @@ const BinMap: React.FC<BinMapProps> = ({
         { icon: createBinIcon(bin.fillLevel, areaId) }
       );
       
-      // Add popup with bin info
-      const popupContent = `
-        <div>
-          <strong>Fill Level:</strong> ${bin.fillLevel}%<br>
-          ${bin.address ? `<strong>Address:</strong> ${bin.address}<br>` : ''}
-          ${bin.lastCollected ? `<strong>Last Collected:</strong> ${new Date(bin.lastCollected).toLocaleString()}<br>` : ''}
-        </div>
-      `;
-      marker.bindPopup(popupContent);
+      // Add interactions (click, double click)
+      addBinMarkerInteractions(marker, bin);
       
-      marker.on('click', () => {
-        onBinSelect?.(bin);
-      });
-
-      marker.addTo(mapRef.current!);
+      // Add to map
+      if (mapRef.current) marker.addTo(mapRef.current);
+      
       return marker;
     });
 
@@ -278,9 +291,6 @@ const BinMap: React.FC<BinMapProps> = ({
           weight: 2
         }).addTo(mapRef.current!);
         
-        // Add popup with area info
-        polygon.bindPopup(`<b>${area.areaName}</b><br>${area.bins.length} bins`);
-        
         areaPolygonsRef.current.push(polygon);
         
         // Add markers for start and end locations
@@ -293,7 +303,6 @@ const BinMap: React.FC<BinMapProps> = ({
               iconAnchor: [6, 6]
             })
           })
-          .bindPopup(`Start point for ${area.areaName}`)
           .addTo(mapRef.current!);
         }
         
@@ -306,7 +315,6 @@ const BinMap: React.FC<BinMapProps> = ({
               iconAnchor: [6, 6]
             })
           })
-          .bindPopup(`End point for ${area.areaName}`)
           .addTo(mapRef.current!);
         }
       }
@@ -387,6 +395,7 @@ const BinMap: React.FC<BinMapProps> = ({
     fitToCurrentSegment, 
     fitToAreas,
     onBinSelect,
+    onBinDoubleClick, // Add to dependency array
     areaColors,
     colorByArea
   ]);
