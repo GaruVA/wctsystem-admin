@@ -320,6 +320,18 @@ export default function DashboardPage() {
                         </div>
 
                         <div className="space-y-4 flex-1">
+                          {/* Add waste type with appropriate coloring */}
+                          <div>
+                            <p className="text-xs text-gray-500">Waste Type</p>
+                            <p className={`font-medium ${
+                              selectedBin.wasteTypes === 'RECYCLE' ? 'text-yellow-500' :
+                              selectedBin.wasteTypes === 'GENERAL' ? 'text-blue-500' :
+                              selectedBin.wasteTypes === 'ORGANIC' ? 'text-green-500' :
+                              selectedBin.wasteTypes === 'HAZARDOUS' ? 'text-red-500' : ''
+                            }`}>
+                              {selectedBin.wasteTypes}
+                            </p>
+                          </div>
                           <div>
                             <p className="text-xs text-gray-500">Bin ID</p>
                             <p className="font-medium">{selectedBin._id.substring(0, 8)}...</p>

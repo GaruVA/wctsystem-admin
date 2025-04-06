@@ -71,7 +71,8 @@ const BinMap: React.FC<BinMapProps> = ({
   }, [areas, colorByArea]);
 
   // Custom icon for bins
-  const createBinIcon = (fillLevel: number, areaId?: string) => {
+  const createBinIcon = (fillLevel: number, wasteTypes?: string, areaId?: string) => {
+    // Fill level colors (primary color indicator)
     const getFillLevelColor = (level: number) => {
       if (level >= 90) return '#EF4444'; // Red
       if (level >= 70) return '#F59E0B'; // Orange
@@ -79,44 +80,110 @@ const BinMap: React.FC<BinMapProps> = ({
       return '#10B981'; // Green
     };
 
-    // Use area color if colorByArea is true and areaId is provided
-    const color = colorByArea && areaId && areaColors.has(areaId)
-      ? areaColors.get(areaId)
-      : getFillLevelColor(fillLevel);
+    const fillLevelColor = getFillLevelColor(fillLevel);
 
     return L.divIcon({
       className: 'custom-bin-marker',
       html: `
         <div style="
-          width: 32px; 
-          height: 32px; 
-          border-radius: 50%; 
-          background-color: ${color}; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center;
-          border: 2px solid white;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.3);
           position: relative;
+          width: 24px; 
+          height: 28px;
         ">
+          <div style="
+            width: 24px;
+            height: 24px;
+            background-color: ${fillLevelColor};
+            border-radius: 4px;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            position: relative;
+          ">
+            ${fillLevel}%
+          </div>
           <div style="
             position: absolute;
             bottom: -5px;
+            left: 0;
             width: 100%;
             text-align: center;
             font-size: 9px;
             font-weight: bold;
-            background: rgba(255,255,255,0.8);
+            background: white;
             border-radius: 2px;
             padding: 0 2px;
           ">
-            ${fillLevel}%
+            ${wasteTypes ? wasteTypes.substring(0, 3) : 'N/A'}
           </div>
         </div>
       `,
-      iconSize: [32, 32],
-      iconAnchor: [16, 16]
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
     });
+  };
+
+  // Add legend to the map
+  const addLegend = () => {
+    if (!mapRef.current) return;
+    
+    // Remove existing legend if any
+    const existingLegend = document.querySelector('.map-legend');
+    if (existingLegend) existingLegend.remove();
+    
+    // Create legend control
+    const legend = new L.Control({ position: 'bottomright' });
+    
+    legend.onAdd = () => {
+      const div = L.DomUtil.create('div', 'map-legend');
+      div.innerHTML = `
+        <div style="
+          background: white;
+          padding: 10px;
+          border-radius: 5px;
+          box-shadow: 0 0 5px rgba(0,0,0,0.2);
+        ">
+          <div style="font-weight: bold; margin-bottom: 5px;">Fill Level</div>
+          <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 15px; height: 15px; background-color: #10B981; border-radius: 2px; margin-right: 5px;"></div>
+            <span>< 50% - Low</span>
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 15px; height: 15px; background-color: #FBBF24; border-radius: 2px; margin-right: 5px;"></div>
+            <span>50-70% - Medium</span>
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 15px; height: 15px; background-color: #F59E0B; border-radius: 2px; margin-right: 5px;"></div>
+            <span>70-90% - High</span>
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 10px;">
+            <div style="width: 15px; height: 15px; background-color: #EF4444; border-radius: 2px; margin-right: 5px;"></div>
+            <span>≥ 90% - Critical</span>
+          </div>
+          
+          <div style="font-weight: bold; margin-bottom: 5px;">Waste Types</div>
+          <div style="font-size: 11px; margin-top: 3px;">
+            <span class="font-medium">GEN</span> - General
+          </div>
+          <div style="font-size: 11px; margin-top: 3px;">
+            <span class="font-medium">ORG</span> - Organic
+          </div>
+          <div style="font-size: 11px; margin-top: 3px;">
+            <span class="font-medium">REC</span> - Recycle
+          </div>
+          <div style="font-size: 11px; margin-top: 3px;">
+            <span class="font-medium">HAZ</span> - Hazardous
+          </div>
+        </div>
+      `;
+      return div;
+    };
+    
+    legend.addTo(mapRef.current);
   };
 
   // Initialize map
@@ -135,6 +202,9 @@ const BinMap: React.FC<BinMapProps> = ({
 
       mapRef.current = map;
       mapInitializedRef.current = true;
+
+      // Add legend to the map
+      addLegend();
     }
 
     return () => {
@@ -236,7 +306,7 @@ const BinMap: React.FC<BinMapProps> = ({
     binMarkersRef.current = allBins.map(({ bin, areaId }) => {
       const marker = L.marker(
         [bin.location.coordinates[1], bin.location.coordinates[0]], 
-        { icon: createBinIcon(bin.fillLevel, areaId) }
+        { icon: createBinIcon(bin.fillLevel, bin.wasteTypes, areaId) }
       );
       
       // Add interactions (click, double click)

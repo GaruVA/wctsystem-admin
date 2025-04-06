@@ -12,6 +12,7 @@ export interface Bin {
   fillLevel: number;
   lastCollected: string;
   address?: string;
+  wasteTypes: string; // Added wasteTypes property
 }
 
 // Interface for area data with bins
