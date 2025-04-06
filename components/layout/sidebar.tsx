@@ -1,90 +1,90 @@
-"use client";
+"use client"
 
-import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Route,
-  Users,
-  BarChart3,
-  LogOut,
-  Trash2,
-} from 'lucide-react';
+import type React from "react"
 
-export default function Sidebar() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const currentPath = pathname?.split('/').pop() || 'dashboard';
+import { usePathname } from "next/navigation"
+import Link from "next/link"
+import { cn } from "@/lib/utils"
+import { 
+  BarChart3, 
+  LayoutDashboard, 
+  Route, 
+  Users, 
+  Settings, 
+  LogOut, 
+  Trash2 
+} from "lucide-react"
 
-  const isActivePath = (path: string) => {
-    return currentPath === path;
-  };
+interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
+
+export default function Sidebar({ className }: SidebarProps) {
+  const pathname = usePathname()
+
+  const routes = [
+    {
+      name: "Dashboard",
+      path: "/dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      name: "Route Scheduling",
+      path: "/dashboard/schedule",
+      icon: Route,
+    },
+    {
+      name: "Collector Management",
+      path: "/dashboard/collectors",
+      icon: Users,
+    },
+    {
+      name: "Reports",
+      path: "/dashboard/reports",
+      icon: BarChart3,
+    },
+    {
+      name: "Settings",
+      path: "/dashboard/settings",
+      icon: Settings,
+    },
+  ]
 
   return (
-    <div className="w-64 bg-gradient-to-b from-blue-900 to-blue-950 text-white fixed top-0 left-0 h-screen p-4 shadow-xl flex flex-col">
-      <div className="mb-8 flex items-center gap-2 px-2">
-        <Trash2 size={28} className="text-blue-400" />
-        <h1 className="text-xl font-semibold tracking-tight">WCT System</h1>
+    <div className={cn("flex h-screen w-64 flex-col bg-background border-r", className)}>
+      <div className="flex items-center gap-2 p-4 border-b">
+        <Trash2 className="h-5 w-5 text-primary" />
+        <span className="font-semibold">WCT System</span>
       </div>
-
-      <nav className="flex-1">
-        <ul>
-          <li className="mb-2">
-            <Link 
-              href="/dashboard" 
-              className={`flex items-center gap-3 p-3 rounded-md transition-all duration-200 hover:bg-blue-800 ${
-                isActivePath('dashboard') ? 'bg-blue-800 text-white' : 'text-gray-300'
-              }`}
-            >
-              <LayoutDashboard size={20} />
-              <span>Dashboard</span>
-            </Link>
-          </li>
-          <li className="mb-2">
-            <Link 
-              href="/dashboard/schedule" 
-              className={`flex items-center gap-3 p-3 rounded-md transition-all duration-200 hover:bg-blue-800 ${
-                isActivePath('schedule') ? 'bg-blue-800 text-white' : 'text-gray-300'
-              }`}
-            >
-              <Route size={20} />
-              <span>Route Scheduling</span>
-            </Link>
-          </li>
-          <li className="mb-2">
-            <Link 
-              href="/dashboard/collectors" 
-              className={`flex items-center gap-3 p-3 rounded-md transition-all duration-200 hover:bg-blue-800 ${
-                isActivePath('collectors') ? 'bg-blue-800 text-white' : 'text-gray-300'
-              }`}
-            >
-              <Users size={20} />
-              <span>Collector Management</span>
-            </Link>
-          </li>
-          <li className="mb-2">
-            <Link 
-              href="/dashboard/reports" 
-              className={`flex items-center gap-3 p-3 rounded-md transition-all duration-200 hover:bg-blue-800 ${
-                isActivePath('reports') ? 'bg-blue-800 text-white' : 'text-gray-300'
-              }`}
-            >
-              <BarChart3 size={20} />
-              <span>Reports</span>
-            </Link>
-          </li>
-        </ul>
-      </nav>
       
-      <div className="mt-auto border-t border-blue-800 pt-4">
-        <Link 
-          href="/auth/login" 
-          className="flex items-center gap-3 p-3 rounded-md text-gray-300 hover:bg-blue-800 transition-all duration-200"
+      <div className="flex flex-col gap-1 p-3 flex-1">
+        {routes.map((route) => (
+          <Link
+            key={route.path}
+            href={route.path}
+            className={cn(
+              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              pathname === route.path || (pathname?.includes(route.path) && route.path !== "/dashboard")
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            <route.icon className="h-4 w-4" />
+            {route.name}
+          </Link>
+        ))}
+      </div>
+      
+      <div className="border-t p-3">
+        <Link
+          href="/login"
+          className={cn(
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
         >
-          <LogOut size={20} />
-          <span>Logout</span>
+          <LogOut className="h-4 w-4" />
+          Logout
         </Link>
       </div>
     </div>
-  );
+  )
 }
