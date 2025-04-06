@@ -432,7 +432,8 @@ export default function SchedulePage() {
         },
         fillLevel: 100,
         lastCollected: new Date().toISOString(),
-        address: `Custom waypoint (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+        address: `Custom waypoint (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+        wasteTypes: ""
       };
       
       setRouteBins([...routeBins, {

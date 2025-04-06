@@ -20,7 +20,7 @@ interface BinMapProps {
     latitude: number;
     longitude: number;
   };
-  onBinSelect?: (bin: Bin) => void;
+  onBinSelect?: (bin: Bin | null) => void;
   onBinDoubleClick?: (bin: Bin) => void; // Add double click handler
   selectedBin?: Bin | null;
   style?: React.CSSProperties;
@@ -200,6 +200,13 @@ const BinMap: React.FC<BinMapProps> = ({
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
 
+      // Add click handler to deselect bin when clicking on the map
+      map.on('click', () => {
+        if (onBinSelect && selectedBin) {
+          onBinSelect(null);
+        }
+      });
+
       mapRef.current = map;
       mapInitializedRef.current = true;
 
@@ -214,7 +221,7 @@ const BinMap: React.FC<BinMapProps> = ({
         mapInitializedRef.current = false;
       }
     };
-  }, []);
+  }, [onBinSelect, selectedBin]);
 
   // Fit map to coordinates
   const fitMapToCoordinates = (coordinates: { lat: number; lng: number }[]) => {
@@ -231,10 +238,15 @@ const BinMap: React.FC<BinMapProps> = ({
 
   // Function to handle bin marker interactions
   const addBinMarkerInteractions = (marker: L.Marker, bin: Bin) => {
-    // Handle click to select bin
+    // Handle click to select bin or deselect if already selected
     marker.on('click', () => {
       if (onBinSelect) {
-        onBinSelect(bin);
+        // If this bin is already selected, deselect it by passing null
+        if (selectedBin && selectedBin._id === bin._id) {
+          onBinSelect(null);
+        } else {
+          onBinSelect(bin);
+        }
       }
     });
     

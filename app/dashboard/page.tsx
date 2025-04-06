@@ -9,22 +9,23 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import BinMap from "@/components/dashboard/bin-map";
 import { 
-  BarChart3, 
-  Clock, 
   RefreshCcw, 
   Trash2, 
   Truck,
   ArrowUpRight,
-  ArrowDownRight,
   Percent,
-  Map
+  Map,
+  AlertCircle,
+  AlertTriangle
 } from "lucide-react";
 import { getAllAreasWithBins, AreaWithBins, Bin } from "@/lib/api/areas";
+import { cn } from "@/lib/utils";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api", // Replace with your actual backend URL
+  baseURL: "http://localhost:5000/api", 
 });
 
 interface AnalyticsData {
@@ -33,7 +34,17 @@ interface AnalyticsData {
     collectionEfficiency: number;
     serviceDelay: number;
     bins: number;
+    wasteTypeDistribution: Record<string, number>;
   };
+}
+
+interface Alert {
+  id: string;
+  title: string;
+  description: string;
+  time: string;
+  severity: 'high' | 'medium' | 'low';
+  type: string;
 }
 
 export default function DashboardPage() {
@@ -45,18 +56,21 @@ export default function DashboardPage() {
   const [areasLoading, setAreasLoading] = useState<boolean>(true);
   const [areasError, setAreasError] = useState<string | null>(null);
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'overview' | 'area' | 'bin'>('overview');
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   
   const [overallStats, setOverallStats] = useState({
     avgUtilization: 0,
     totalBins: 0,
     avgEfficiency: 0,
-    avgDelay: 0
+    avgDelay: 0,
+    criticalBins: 0,
+    routeCompletion: 75 // Simulated data, replace with actual data when available
   });
 
   useEffect(() => {
     fetchAnalytics();
     fetchAreas();
+    generateMockAlerts(); // Replace with real alerts API when available
   }, []);
 
   useEffect(() => {
@@ -67,31 +81,34 @@ export default function DashboardPage() {
       const avgEff = areas.reduce((acc, area) => acc + area.collectionEfficiency, 0) / areas.length;
       const avgDelay = areas.reduce((acc, area) => acc + area.serviceDelay, 0) / areas.length;
 
+      // Get count of bins with fill level > 80%
+      let criticalBinsCount = 0;
+      areas.forEach(area => {
+        if (area && typeof area === 'object' && 'bins' in area) {
+          const bins = area.bins;
+          if (Array.isArray(bins)) {
+            criticalBinsCount += bins.filter(bin => bin && bin.fillLevel > 80).length;
+          }
+        }
+      });
+
       setOverallStats({
         totalBins,
         avgUtilization: avgUtil,
         avgEfficiency: avgEff,
-        avgDelay: avgDelay
+        avgDelay: avgDelay,
+        criticalBins: criticalBinsCount || Math.round(totalBins * 0.15), // Fallback to estimation
+        routeCompletion: 75 // Simulated data
       });
     }
   }, [analytics]);
-
-  useEffect(() => {
-    if (selectedBin) {
-      setActiveView('bin');
-    } else if (selectedArea) {
-      setActiveView('area');
-    } else {
-      setActiveView('overview');
-    }
-  }, [selectedBin, selectedArea]);
 
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
       const response = await api.get("/analytics/analytics", {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("adminToken")}`, // Replace with your actual token
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
         },
       });
       setAnalytics(response.data as AnalyticsData);
@@ -101,9 +118,42 @@ export default function DashboardPage() {
       
       // Mock data for development
       setAnalytics({
-        "Area-001": { utilization: 78, collectionEfficiency: 92, serviceDelay: 12, bins: 34 },
-        "Area-002": { utilization: 65, collectionEfficiency: 87, serviceDelay: 18, bins: 28 },
-        "Area-003": { utilization: 83, collectionEfficiency: 95, serviceDelay: 8, bins: 42 }
+        "Area-001": { 
+          utilization: 78, 
+          collectionEfficiency: 92, 
+          serviceDelay: 12, 
+          bins: 34,
+          wasteTypeDistribution: {
+            "GENERAL": 15,
+            "ORGANIC": 8,
+            "RECYCLE": 7,
+            "HAZARDOUS": 4
+          }
+        },
+        "Area-002": { 
+          utilization: 65, 
+          collectionEfficiency: 87, 
+          serviceDelay: 18, 
+          bins: 28,
+          wasteTypeDistribution: {
+            "GENERAL": 12,
+            "ORGANIC": 6,
+            "RECYCLE": 7,
+            "HAZARDOUS": 3
+          }
+        },
+        "Area-003": { 
+          utilization: 83, 
+          collectionEfficiency: 95, 
+          serviceDelay: 8, 
+          bins: 42,
+          wasteTypeDistribution: {
+            "GENERAL": 20,
+            "ORGANIC": 10,
+            "RECYCLE": 8,
+            "HAZARDOUS": 4
+          }
+        }
       });
     } finally {
       setLoading(false);
@@ -124,7 +174,39 @@ export default function DashboardPage() {
     }
   };
 
-  const handleBinSelect = (bin: Bin) => {
+  // Generate mock alerts - replace with real API call when available
+  const generateMockAlerts = () => {
+    const mockAlerts: Alert[] = [
+      {
+        id: '1',
+        title: 'Critical Bin Level',
+        description: 'Bin HZ-789 has reached 95% capacity in Wellawatte South',
+        time: '2 minutes ago',
+        severity: 'high',
+        type: 'bin'
+      },
+      {
+        id: '2',
+        title: 'Collection Route Completed',
+        description: 'Collector John Smith has completed Route #34',
+        time: '15 minutes ago',
+        severity: 'medium',
+        type: 'route'
+      },
+      {
+        id: '3',
+        title: 'System Maintenance',
+        description: 'Scheduled maintenance on April 10, 2025 from 2-4am',
+        time: '1 hour ago',
+        severity: 'low',
+        type: 'system'
+      }
+    ];
+    
+    setAlerts(mockAlerts);
+  };
+
+  const handleBinSelect = (bin: Bin | null) => {
     setSelectedBin(bin);
   };
 
@@ -135,352 +217,223 @@ export default function DashboardPage() {
     return value > 80 ? 'text-green-500' : value > 60 ? 'text-amber-500' : 'text-red-500';
   };
 
-  const getCurrentAreaDetails = () => {
-    if (!selectedArea) return null;
-    return areas.find(area => area.areaID === selectedArea);
-  };
-
   const filteredAreas = selectedArea
     ? areas.filter(area => area.areaID === selectedArea)
     : areas;
 
+  const getAlertIcon = (severity: string, type: string) => {
+    if (type === 'bin') return <Trash2 className="h-5 w-5" />;
+    if (type === 'route') return <Truck className="h-5 w-5" />;
+    if (type === 'system') return <AlertCircle className="h-5 w-5" />;
+    return <AlertTriangle className="h-5 w-5" />;
+  };
+
+  const getAlertColor = (severity: string) => {
+    switch(severity) {
+      case 'high': return 'text-red-500 bg-red-100';
+      case 'medium': return 'text-amber-500 bg-amber-100';
+      case 'low': return 'text-blue-500 bg-blue-100';
+      default: return 'text-gray-500 bg-gray-100';
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <button 
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          onClick={() => {
-            fetchAnalytics();
-            fetchAreas();
-          }}
-          disabled={loading || areasLoading}
-        >
-          <RefreshCcw size={16} className={loading || areasLoading ? 'animate-spin' : ''} /> 
-          Refresh
-        </button>
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            size="sm"
+          >
+            Export
+          </Button>
+          <Button 
+            size="sm"
+            onClick={() => {
+              fetchAnalytics();
+              fetchAreas();
+              generateMockAlerts();
+            }}
+            disabled={loading || areasLoading}
+          >
+            {(loading || areasLoading) ? (
+              <RefreshCcw size={16} className="animate-spin mr-2" />
+            ) : (
+              <RefreshCcw size={16} className="mr-2" />
+            )}
+            Refresh Data
+          </Button>
+        </div>
       </div>
 
-      {/* Stats overview cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Bins</p>
-                <h3 className="text-2xl font-bold mt-1">{overallStats.totalBins}</h3>
-              </div>
-              <div className="p-2 bg-blue-100 rounded-full">
-                <Trash2 className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="space-y-4">
+        {/* Stats Cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Bins</CardTitle>
+              <Trash2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{overallStats.totalBins}</div>
+              <p className="text-xs text-muted-foreground">Across all collection areas</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Avg. Utilization</p>
-                <h3 className="text-2xl font-bold mt-1 flex items-center">
-                  {overallStats.avgUtilization.toFixed(1)}%
-                  <ArrowUpRight className={`h-4 w-4 ml-1 ${getStatusColor(overallStats.avgUtilization)}`} />
-                </h3>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Avg. Utilization</CardTitle>
+              <Percent className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold flex items-center gap-1">
+                {overallStats.avgUtilization.toFixed(1)}%
+                <ArrowUpRight className={`h-4 w-4 ${getStatusColor(overallStats.avgUtilization)}`} />
               </div>
-              <div className="p-2 bg-green-100 rounded-full">
-                <Percent className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <p className="text-xs text-muted-foreground">+2.5% from last week</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Collection Efficiency</p>
-                <h3 className="text-2xl font-bold mt-1 flex items-center">
-                  {overallStats.avgEfficiency.toFixed(1)}%
-                  <ArrowUpRight className={`h-4 w-4 ml-1 ${getStatusColor(overallStats.avgEfficiency)}`} />
-                </h3>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Collection Efficiency</CardTitle>
+              <Truck className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold flex items-center gap-1">
+                {overallStats.avgEfficiency.toFixed(1)}%
               </div>
-              <div className="p-2 bg-amber-100 rounded-full">
-                <Truck className="h-6 w-6 text-amber-600" />
+              <div className="mt-1 h-2 w-full rounded-full bg-muted">
+                <div className="h-2 rounded-full bg-green-500" style={{ width: `${overallStats.avgEfficiency}%` }} />
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Avg. Service Delay</p>
-                <h3 className="text-2xl font-bold mt-1 flex items-center">
-                  {overallStats.avgDelay.toFixed(1)} min
-                  <ArrowDownRight className={`h-4 w-4 ml-1 ${getStatusColor(overallStats.avgDelay, true)}`} />
-                </h3>
-              </div>
-              <div className="p-2 bg-purple-100 rounded-full">
-                <Clock className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Critical Bins</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-500">{overallStats.criticalBins}</div>
+              <p className="text-xs text-muted-foreground">Bins above 80% fill level</p>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Area Map Section */}
-      <div className="grid grid-cols-1 gap-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Map size={20} />
-              <span>Waste Collection Areas</span>
-              <div className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
-                Live view
-              </div>
-            </CardTitle>
-            <CardDescription>
-              Collection areas with bin locations and boundaries
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {areasLoading && (
-              <div className="flex justify-center items-center h-96">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
-              </div>
-            )}
+        {/* Map and Alerts */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="col-span-3 md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Map size={18} />
+                Waste Collection Areas
+              </CardTitle>
+              <CardDescription>
+                Collection areas with bin locations and boundaries
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 h-[438px]">
+              {areasLoading && (
+                <div className="flex justify-center items-center h-full">
+                  <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              )}
 
-            {areasError && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                {areasError}
-              </div>
-            )}
+              {areasError && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded m-6">
+                  {areasError}
+                </div>
+              )}
 
-            {!areasLoading && !areasError && (
-              <>
-                <div className="mb-4 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setSelectedArea(null)}
-                    className={`px-3 py-1 text-sm rounded ${
-                      selectedArea === null
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 hover:bg-gray-300'
-                    }`}
-                  >
-                    All Areas ({areas.length})
-                  </button>
-                  
-                  {areas.map(area => (
+              {!areasLoading && !areasError && (
+                <>
+                  <div className="mb-4 flex flex-wrap gap-2 px-6">
                     <button
-                      key={area.areaID}
-                      onClick={() => setSelectedArea(area.areaID)}
+                      onClick={() => setSelectedArea(null)}
                       className={`px-3 py-1 text-sm rounded ${
-                        selectedArea === area.areaID
+                        selectedArea === null
                           ? 'bg-blue-600 text-white'
                           : 'bg-gray-200 hover:bg-gray-300'
                       }`}
                     >
-                      {area.areaName} ({area.bins.length})
+                      All Areas ({areas.length})
                     </button>
-                  ))}
-                </div>
-
-                <div className="flex flex-col lg:flex-row gap-4">
-                  {/* Map section (3/4 width) */}
-                  <div className="lg:w-3/4 rounded-md overflow-hidden border border-gray-200">
-                    <BinMap 
-                      areas={filteredAreas} 
-                      fitToAreas={true} 
-                      onBinSelect={handleBinSelect}
-                      selectedBin={selectedBin}
-                      style={{ height: "500px" }}
-                    />
+                    
+                    {areas.map(area => (
+                      <button
+                        key={area.areaID}
+                        onClick={() => setSelectedArea(area.areaID)}
+                        className={`px-3 py-1 text-sm rounded ${
+                          selectedArea === area.areaID
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                      >
+                        {area.areaName} ({area.bins.length})
+                      </button>
+                    ))}
                   </div>
-                  
-                  {/* Details panel (1/4 width) */}
-                  <div className="lg:w-1/4 flex flex-col">
-                    {selectedBin ? (
-                      <div className="h-full p-4 bg-gray-50 border border-gray-200 rounded-md flex flex-col">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full ${selectedBin.fillLevel >= 80 ? 'bg-red-500' : selectedBin.fillLevel >= 50 ? 'bg-amber-500' : 'bg-green-500'}`}></div>
-                            <h3 className="font-semibold">Bin Details</h3>
-                          </div>
-                          <button 
-                            onClick={() => setSelectedBin(null)}
-                            className="text-gray-500 hover:text-gray-700"
-                            aria-label="Close bin details"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="18" y1="6" x2="6" y2="18"></line>
-                              <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                          </button>
-                        </div>
 
-                        <div className="space-y-4 flex-1">
-                          {/* Add waste type with appropriate coloring */}
-                          <div>
-                            <p className="text-xs text-gray-500">Waste Type</p>
-                            <p className={`font-medium ${
-                              selectedBin.wasteTypes === 'RECYCLE' ? 'text-yellow-500' :
-                              selectedBin.wasteTypes === 'GENERAL' ? 'text-blue-500' :
-                              selectedBin.wasteTypes === 'ORGANIC' ? 'text-green-500' :
-                              selectedBin.wasteTypes === 'HAZARDOUS' ? 'text-red-500' : ''
-                            }`}>
-                              {selectedBin.wasteTypes}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Bin ID</p>
-                            <p className="font-medium">{selectedBin._id.substring(0, 8)}...</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Fill Level</p>
-                            <p className="font-medium">{selectedBin.fillLevel}%</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Location</p>
-                            <p className="font-medium">{selectedBin.location.coordinates[1].toFixed(4)}, {selectedBin.location.coordinates[0].toFixed(4)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Last Collected</p>
-                            <p className="font-medium">{new Date(selectedBin.lastCollected).toLocaleString()}</p>
-                          </div>
-                          {selectedBin.address && (
-                            <div>
-                              <p className="text-xs text-gray-500">Address</p>
-                              <p className="font-medium break-words">{selectedBin.address}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : selectedArea ? (
-                      // Area details when an area is selected but no bin
-                      <div className="h-full p-4 bg-gray-50 border border-gray-200 rounded-md flex flex-col">
-                        {(() => {
-                          const areaDetails = getCurrentAreaDetails();
-                          const areaAnalytics = analytics && analytics[selectedArea];
-                          
-                          if (!areaDetails) return <div>Loading area details...</div>;
-                          
-                          return (
-                            <>
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                                  <h3 className="font-semibold">Area Details</h3>
-                                </div>
-                                <button 
-                                  onClick={() => setSelectedArea(null)}
-                                  className="text-gray-500 hover:text-gray-700"
-                                  aria-label="Close area details"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                                  </svg>
-                                </button>
-                              </div>
+                  <BinMap 
+                    areas={filteredAreas} 
+                    fitToAreas={true} 
+                    onBinSelect={handleBinSelect}
+                    selectedBin={selectedBin}
+                    style={{ height: "395px" }}
+                  />
+                </>
+              )}
+            </CardContent>
+          </Card>
 
-                              <div className="space-y-4 flex-1">
-                                <div>
-                                  <p className="text-xs text-gray-500">Area Name</p>
-                                  <p className="font-medium">{areaDetails.areaName}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-500">Area ID</p>
-                                  <p className="font-medium">{areaDetails.areaID}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-500">Total Bins</p>
-                                  <p className="font-medium">{areaDetails.bins.length}</p>
-                                </div>
-                                
-                                {areaAnalytics && (
-                                  <>
-                                    <div>
-                                      <p className="text-xs text-gray-500">Utilization</p>
-                                      <p className={`font-medium ${getStatusColor(areaAnalytics.utilization)}`}>
-                                        {areaAnalytics.utilization}%
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs text-gray-500">Collection Efficiency</p>
-                                      <p className={`font-medium ${getStatusColor(areaAnalytics.collectionEfficiency)}`}>
-                                        {areaAnalytics.collectionEfficiency}%
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs text-gray-500">Service Delay</p>
-                                      <p className={`font-medium ${getStatusColor(areaAnalytics.serviceDelay, true)}`}>
-                                        {areaAnalytics.serviceDelay} min
-                                      </p>
-                                    </div>
-                                  </>
-                                )}
-                                
-                                <div>
-                                  <p className="text-xs text-gray-500">Start Location</p>
-                                  <p className="font-medium">
-                                    {areaDetails.startLocation.coordinates[1].toFixed(4)}, 
-                                    {areaDetails.startLocation.coordinates[0].toFixed(4)}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-500">End Location</p>
-                                  <p className="font-medium">
-                                    {areaDetails.endLocation.coordinates[1].toFixed(4)}, 
-                                    {areaDetails.endLocation.coordinates[0].toFixed(4)}
-                                  </p>
-                                </div>
-                                
-                                <div className="mt-4">
-                                  <p className="text-xs font-medium text-blue-600">Bin Status</p>
-                                  <div className="mt-2 flex items-center gap-4">
-                                    <div className="flex flex-col items-center">
-                                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                                      <p className="text-xs mt-1">
-                                        {areaDetails.bins.filter(b => b.fillLevel >= 80).length}
-                                      </p>
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                      <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                                      <p className="text-xs mt-1">
-                                        {areaDetails.bins.filter(b => b.fillLevel >= 50 && b.fillLevel < 80).length}
-                                      </p>
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                                      <p className="text-xs mt-1">
-                                        {areaDetails.bins.filter(b => b.fillLevel < 50).length}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    ) : (
-                      // No selection state
-                      <div className="h-full p-4 bg-gray-50 border border-gray-200 rounded-md flex items-center justify-center text-center">
-                        <div className="text-gray-500">
-                          <svg className="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                          </svg>
-                          <p className="mt-2 font-medium">Select an area or bin to view details</p>
-                        </div>
-                      </div>
+          {/* Real-time alerts container */}
+          <Card className="col-span-3 md:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle size={18} className="text-amber-500" />
+                Real-time Alerts
+              </CardTitle>
+              <CardDescription>
+                System notifications and important updates
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {alerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className={cn(
+                      "flex items-start gap-4 rounded-md border p-3",
+                      alert.severity === "high"
+                        ? "border-red-200 bg-red-50"
+                        : alert.severity === "medium"
+                          ? "border-yellow-200 bg-yellow-50"
+                          : "border-blue-200 bg-blue-50"
                     )}
+                  >
+                    <div className={cn(
+                      "p-2 rounded-full",
+                      alert.severity === "high"
+                        ? "text-red-500 bg-red-100"
+                        : alert.severity === "medium"
+                          ? "text-yellow-500 bg-yellow-100"
+                          : "text-blue-500 bg-blue-100"
+                    )}>
+                      {getAlertIcon(alert.severity, alert.type)}
+                    </div>
+                    <div className="grid gap-1">
+                      <p className="text-sm font-medium">{alert.title}</p>
+                      <p className="text-xs text-muted-foreground">{alert.description}</p>
+                      <p className="text-xs text-muted-foreground">{alert.time}</p>
+                    </div>
                   </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
