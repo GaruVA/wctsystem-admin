@@ -27,8 +27,8 @@ export default function Sidebar({ className }: SidebarProps) {
       icon: LayoutDashboard,
     },
     {
-      name: "Route Planning",
-      path: "/dashboard/route-planning",
+      name: "Routes",
+      path: "/dashboard/routes",
       icon: Route,
     },
     {
