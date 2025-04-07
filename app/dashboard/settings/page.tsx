@@ -9,8 +9,48 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Save, Upload } from "lucide-react"
-import { useState } from "react"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { MapPin, Save, Upload, Plus, Trash2, Edit, MapPinned, Map, Trash, AlertCircle, Check, X, Info, ArrowDownToLine } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
+import { useState, useEffect } from "react"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import AreaBoundaryMap from "@/components/dashboard/area-boundary-map"
+
+// Interface definitions
+interface Area {
+  _id: string;
+  name: string;
+  geometry: {
+    type: string;
+    coordinates: number[][][];
+  };
+  startLocation: {
+    type: string;
+    coordinates: number[];
+  };
+  endLocation: {
+    type: string;
+    coordinates: number[];
+  };
+}
+
+interface AreaFormData {
+  name: string;
+  geometry?: {
+    type: string;
+    coordinates: number[][][];
+  };
+  startLocation: {
+    coordinates: number[];
+  };
+  endLocation: {
+    coordinates: number[];
+  };
+}
 
 export default function SettingsPage() {
   const [showSecrets, setShowSecrets] = useState({
@@ -18,6 +58,275 @@ export default function SettingsPage() {
     jwt: false,
     ors: false
   });
+  
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedArea, setSelectedArea] = useState<Area | null>(null);
+  
+  const defaultGeometry = {
+    type: "Polygon",
+    coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]]
+  };
+  
+  // Form state for creating/editing an area
+  const [areaForm, setAreaForm] = useState<AreaFormData>({
+    name: "",
+    startLocation: {
+      coordinates: [79.861, 6.927]
+    },
+    endLocation: {
+      coordinates: [79.861, 6.927]
+    }
+  });
+
+  // Area to reassign bins and collectors to when deleting an area
+  const [reassignAreaId, setReassignAreaId] = useState<string>("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [areaToDelete, setAreaToDelete] = useState<string>("");
+
+  // Fetch all areas on component mount
+  useEffect(() => {
+    fetchAreas();
+  }, []);
+
+  const fetchAreas = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('http://localhost:5000/api/areas', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch areas');
+      }
+      
+      const data = await response.json();
+      setAreas(data);
+    } catch (error) {
+      console.error('Error fetching areas:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load areas",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOpenCreateDialog = () => {
+    setAreaForm({
+      name: "",
+      startLocation: {
+        coordinates: [79.861, 6.927]
+      },
+      endLocation: {
+        coordinates: [79.861, 6.927]
+      }
+    });
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (area: Area) => {
+    setSelectedArea(area);
+    setAreaForm({
+      name: area.name,
+      startLocation: {
+        coordinates: [...area.startLocation.coordinates]
+      },
+      endLocation: {
+        coordinates: [...area.endLocation.coordinates]
+      },
+      geometry: area.geometry
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleOpenDeleteDialog = (areaId: string) => {
+    setAreaToDelete(areaId);
+    setReassignAreaId("");
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleCreateArea = async () => {
+    try {
+      // Validate form data
+      if (!areaForm.name.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Area name is required",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('http://localhost:5000/api/areas/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: areaForm.name,
+          geometry: areaForm.geometry,
+          startLocation: {
+            type: "Point",
+            coordinates: areaForm.startLocation.coordinates
+          },
+          endLocation: {
+            type: "Point",
+            coordinates: areaForm.endLocation.coordinates
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create area');
+      }
+
+      toast({
+        title: "Success",
+        description: "Area created successfully"
+      });
+
+      setIsCreateDialogOpen(false);
+      fetchAreas();
+    } catch (error) {
+      console.error('Error creating area:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create area",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUpdateArea = async () => {
+    if (!selectedArea) return;
+    
+    try {
+      // Validate form data
+      if (!areaForm.name.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Area name is required",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('http://localhost:5000/api/areas/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          areaId: selectedArea._id,
+          name: areaForm.name,
+          geometry: areaForm.geometry || selectedArea.geometry,
+          startLocation: {
+            type: "Point",
+            coordinates: areaForm.startLocation.coordinates
+          },
+          endLocation: {
+            type: "Point",
+            coordinates: areaForm.endLocation.coordinates
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update area');
+      }
+
+      toast({
+        title: "Success",
+        description: "Area updated successfully"
+      });
+
+      setIsEditDialogOpen(false);
+      fetchAreas();
+    } catch (error) {
+      console.error('Error updating area:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update area",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteArea = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const requestOptions: RequestInit = {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      };
+
+      // If reassignment area is selected, add it to request body
+      if (reassignAreaId) {
+        requestOptions.body = JSON.stringify({ reassignToAreaId: reassignAreaId });
+      }
+
+      const response = await fetch(`http://localhost:5000/api/areas/${areaToDelete}`, requestOptions);
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete area');
+      }
+      
+      toast({
+        title: "Success",
+        description: reassignAreaId 
+          ? "Area deleted successfully and resources reassigned" 
+          : "Area deleted successfully"
+      });
+      
+      setIsDeleteDialogOpen(false);
+      fetchAreas();
+    } catch (error) {
+      console.error('Error deleting area:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete area",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleLocationChange = (
+    locationType: 'startLocation' | 'endLocation', 
+    coordIndex: number, 
+    value: string
+  ) => {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return;
+
+    setAreaForm(prev => ({
+      ...prev,
+      [locationType]: {
+        ...prev[locationType],
+        coordinates: prev[locationType].coordinates.map(
+          (coord, idx) => idx === coordIndex ? numValue : coord
+        )
+      }
+    }));
+  };
+
+  const formatCoordinates = (coords: number[]) => {
+    return `${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}`;
+  };
 
   return (
       <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -68,53 +377,63 @@ export default function SettingsPage() {
           
           <TabsContent value="collection" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Collection Settings</CardTitle>
-                <CardDescription>Configure waste collection zones and collection parameters</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Area Configuration</CardTitle>
+                  <CardDescription className="mt-1.5">Configure collection areas</CardDescription>
+                </div>
+                <Button onClick={handleOpenCreateDialog} className="ml-auto">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Area
+                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Maximum Bins Per Route</Label>
-                  <Select defaultValue="20">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select maximum bins per route" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10 Bins</SelectItem>
-                      <SelectItem value="15">15 Bins</SelectItem>
-                      <SelectItem value="20">20 Bins</SelectItem>
-                      <SelectItem value="25">25 Bins</SelectItem>
-                      <SelectItem value="30">30 Bins</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Default Collection Start Time</Label>
-                  <Input type="time" defaultValue="08:00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Vehicle Capacity (kg)</Label>
-                  <Input type="number" defaultValue="5000" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Service Time Per Bin (minutes)</Label>
-                  <Input type="number" defaultValue="5" />
-                </div>
-                <div className="flex items-center justify-between space-y-0 pt-2">
-                  <Label htmlFor="weekend-collection">Enable Weekend Collections</Label>
-                  <Switch id="weekend-collection" />
-                </div>
-                <div className="flex items-center justify-between space-y-0">
-                  <Label htmlFor="automatic-scheduling">Automatic Route Scheduling</Label>
-                  <Switch id="automatic-scheduling" defaultChecked />
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Area Name</TableHead>
+                        <TableHead>Start Location</TableHead>
+                        <TableHead>End Location</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center">Loading areas...</TableCell>
+                        </TableRow>
+                      ) : areas.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center">No areas found</TableCell>
+                        </TableRow>
+                      ) : (
+                        areas.map((area) => (
+                          <TableRow key={area._id}>
+                            <TableCell className="font-medium">{area.name}</TableCell>
+                            <TableCell>{formatCoordinates(area.startLocation.coordinates)}</TableCell>
+                            <TableCell>{formatCoordinates(area.endLocation.coordinates)}</TableCell>
+                            <TableCell>
+                              <div className="flex space-x-2">
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(area)}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => handleOpenDeleteDialog(area._id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
-              <CardFooter>
-                <Button>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Collection Settings
-                </Button>
-              </CardFooter>
             </Card>
           </TabsContent>
           
@@ -232,8 +551,179 @@ export default function SettingsPage() {
               </CardFooter>
             </Card>
           </TabsContent>
-        
         </Tabs>
+
+        {/* Create Area Dialog */}
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent className="sm:max-w-[700px]">
+            <DialogHeader>
+              <DialogTitle>Add New Area</DialogTitle>
+              <DialogDescription>
+                Create a new collection area with start and end points. 
+                Draw the area boundary on the map below.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="area-name">Area Name</Label>
+                <Input 
+                  id="area-name" 
+                  value={areaForm.name} 
+                  onChange={(e) => setAreaForm({...areaForm, name: e.target.value})}
+                  placeholder="e.g. Wellawatte South" 
+                />
+              </div>
+
+              <div className="grid gap-2 mt-2">
+                <Label>Area Boundary</Label>
+                <div className="border rounded-md p-1 bg-gray-50">
+                  <AreaBoundaryMap
+                    initialStartLocation={areaForm.startLocation.coordinates}
+                    initialEndLocation={areaForm.endLocation.coordinates}
+                    onBoundaryChange={(coordinates) => 
+                      setAreaForm(prev => ({
+                        ...prev, 
+                        geometry: { 
+                          type: "Polygon",
+                          coordinates 
+                        }
+                      }))
+                    }
+                    onStartLocationChange={(coordinates) => 
+                      setAreaForm(prev => ({
+                        ...prev, 
+                        startLocation: { coordinates }
+                      }))
+                    }
+                    onEndLocationChange={(coordinates) => 
+                      setAreaForm(prev => ({
+                        ...prev, 
+                        endLocation: { coordinates }
+                      }))
+                    }
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Use the drawing tools to define the area boundary. Set start and end locations using the buttons.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateArea}>Create Area</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Area Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[700px]">
+            <DialogHeader>
+              <DialogTitle>Edit Area</DialogTitle>
+              <DialogDescription>
+                Update area details, boundary, and location points.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-area-name">Area Name</Label>
+                <Input 
+                  id="edit-area-name" 
+                  value={areaForm.name} 
+                  onChange={(e) => setAreaForm({...areaForm, name: e.target.value})}
+                />
+              </div>
+
+              <div className="grid gap-2 mt-2">
+                <Label>Area Boundary and Locations</Label>
+                <div className="border rounded-md p-1 bg-gray-50">
+                  <AreaBoundaryMap
+                    initialBoundary={areaForm.geometry?.coordinates}
+                    initialStartLocation={areaForm.startLocation.coordinates}
+                    initialEndLocation={areaForm.endLocation.coordinates}
+                    onBoundaryChange={(coordinates) => 
+                      setAreaForm(prev => ({
+                        ...prev, 
+                        geometry: { 
+                          type: "Polygon",
+                          coordinates 
+                        }
+                      }))
+                    }
+                    onStartLocationChange={(coordinates) => 
+                      setAreaForm(prev => ({
+                        ...prev, 
+                        startLocation: { coordinates }
+                      }))
+                    }
+                    onEndLocationChange={(coordinates) => 
+                      setAreaForm(prev => ({
+                        ...prev, 
+                        endLocation: { coordinates }
+                      }))
+                    }
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Edit the boundary by using the edit tools. Drag the start and end markers to reposition them.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleUpdateArea}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Area Dialog with Reassignment Option */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-[525px]">
+            <DialogHeader>
+              <DialogTitle>Delete Area</DialogTitle>
+              <DialogDescription>
+                This will permanently delete the area. Any bins and collectors assigned to this area can be reassigned.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="reassign-area">Reassign Resources (Optional)</Label>
+                <Select 
+                  value={reassignAreaId} 
+                  onValueChange={(value) => setReassignAreaId(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an area to reassign resources" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Don't reassign resources</SelectItem>
+                    {areas
+                      .filter(area => area._id !== areaToDelete)
+                      .map(area => (
+                        <SelectItem key={area._id} value={area._id}>{area.name}</SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-start space-x-2 pt-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 text-amber-500" />
+                <div className="text-sm text-muted-foreground">
+                  {reassignAreaId ? (
+                    <p>All bins and collectors from this area will be reassigned to the selected area.</p>
+                  ) : (
+                    <p>Bins and collectors will be unassigned. You'll need to manually assign them to areas later.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+              <Button variant="destructive" onClick={handleDeleteArea}>Delete Area</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
   )
 }
