@@ -13,7 +13,6 @@ import { Save, Upload } from "lucide-react"
 
 export default function SettingsPage() {
   return (
-    <MainLayout>
       <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">System Settings</h1>
@@ -22,9 +21,9 @@ export default function SettingsPage() {
         <Tabs defaultValue="general" className="space-y-4">
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="collection">Collection Settings</TabsTrigger>
-            <TabsTrigger value="alerts">Alerts & Notifications</TabsTrigger>
-            <TabsTrigger value="optimization">Route Optimization</TabsTrigger>
+            <TabsTrigger value="collection">Area Configuration</TabsTrigger>
+            <TabsTrigger value="alerts">Notifications</TabsTrigger>
+            <TabsTrigger value="optimization">API Settings</TabsTrigger>
           </TabsList>
           
           <TabsContent value="general" className="space-y-4">
@@ -241,6 +240,5 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </MainLayout>
   )
 }
