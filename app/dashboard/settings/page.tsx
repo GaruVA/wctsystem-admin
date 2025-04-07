@@ -10,8 +10,15 @@ import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Save, Upload } from "lucide-react"
+import { useState } from "react"
 
 export default function SettingsPage() {
+  const [showSecrets, setShowSecrets] = useState({
+    mongodb: false,
+    jwt: false,
+    ors: false
+  });
+
   return (
       <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
         <div className="flex items-center justify-between">
@@ -23,7 +30,7 @@ export default function SettingsPage() {
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="collection">Area Configuration</TabsTrigger>
             <TabsTrigger value="alerts">Notifications</TabsTrigger>
-            <TabsTrigger value="optimization">API Settings</TabsTrigger>
+            <TabsTrigger value="api">API Settings</TabsTrigger>
           </TabsList>
           
           <TabsContent value="general" className="space-y-4">
@@ -46,21 +53,8 @@ export default function SettingsPage() {
                   <Input id="admin-email" type="email" defaultValue="admin@wctsystem.com" />
                 </div>
                 <div className="flex items-center justify-between space-y-0">
-                  <Label htmlFor="dark-mode">Dark Mode</Label>
-                  <Switch id="dark-mode" />
-                </div>
-                <div className="flex items-center justify-between space-y-0">
-                  <Label htmlFor="notifications">Enable System Notifications</Label>
+                  <Label htmlFor="notifications">Enable Notifications</Label>
                   <Switch id="notifications" defaultChecked />
-                </div>
-                <div className="space-y-2 pt-2">
-                  <Label htmlFor="logo-upload">Company Logo</Label>
-                  <div className="flex gap-2">
-                    <Input id="logo-upload" type="file" />
-                    <Button variant="outline" size="icon">
-                      <Upload className="h-4 w-4" />
-                    </Button>
-                  </div>
                 </div>
               </CardContent>
               <CardFooter>
@@ -153,18 +147,6 @@ export default function SettingsPage() {
                   <Label htmlFor="sms-alerts">SMS Alerts</Label>
                   <Switch id="sms-alerts" />
                 </div>
-                <div className="flex items-center justify-between space-y-0">
-                  <Label htmlFor="dashboard-alerts">Dashboard Alerts</Label>
-                  <Switch id="dashboard-alerts" defaultChecked />
-                </div>
-                <div className="flex items-center justify-between space-y-0">
-                  <Label htmlFor="collector-notifications">Driver Mobile Notifications</Label>
-                  <Switch id="collector-notifications" defaultChecked />
-                </div>
-                <div className="space-y-2 pt-2">
-                  <Label htmlFor="alert-emails">Additional Alert Recipients</Label>
-                  <Input id="alert-emails" placeholder="Email addresses separated by commas" />
-                </div>
               </CardContent>
               <CardFooter>
                 <Button>
@@ -174,70 +156,83 @@ export default function SettingsPage() {
               </CardFooter>
             </Card>
           </TabsContent>
-          
-          <TabsContent value="optimization" className="space-y-4">
+
+          <TabsContent value="api" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Route Optimization Settings</CardTitle>
-                <CardDescription>Configure routing engine and optimization parameters</CardDescription>
+                <CardTitle>API Settings</CardTitle>
+                <CardDescription>Configure API keys and database connections</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="api-key">Routing API Key</Label>
-                  <Input id="api-key" type="password" defaultValue="••••••••••••••••" />
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="mongodb-uri">MongoDB URI</Label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setShowSecrets({...showSecrets, mongodb: !showSecrets.mongodb})}
+                    >
+                      {showSecrets.mongodb ? "Hide" : "Show"}
+                    </Button>
+                  </div>
+                  <Input 
+                    id="mongodb-uri" 
+                    type={showSecrets.mongodb ? "text" : "password"}
+                    defaultValue="mongodb+srv://garukaassalaarachchi:RJL8J7ZEnsNzycnt@db.fbree.mongodb.net/wctsystem?retryWrites=true&w=majority&appName=DB" 
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label>Vehicle Type</Label>
-                  <Select defaultValue="garbage-truck">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select vehicle type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="garbage-truck">Garbage Truck</SelectItem>
-                      <SelectItem value="pickup-truck">Pickup Truck</SelectItem>
-                      <SelectItem value="compact-vehicle">Compact Vehicle</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="jwt-secret">JWT Secret</Label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setShowSecrets({...showSecrets, jwt: !showSecrets.jwt})}
+                    >
+                      {showSecrets.jwt ? "Hide" : "Show"}
+                    </Button>
+                  </div>
+                  <Input 
+                    id="jwt-secret" 
+                    type={showSecrets.jwt ? "text" : "password"}
+                    defaultValue="H9igabBAKjzwJoXzepsNHfXo4DAOEvXzSPa-jLq9YUc" 
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label>Route Optimization Strategy</Label>
-                  <Select defaultValue="distance">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select strategy" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="distance">Minimize Distance</SelectItem>
-                      <SelectItem value="time">Minimize Time</SelectItem>
-                      <SelectItem value="balanced">Balanced Approach</SelectItem>
-                      <SelectItem value="fill-priority">Fill Level Priority</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="ors-api-key">OpenRouteService API Key</Label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setShowSecrets({...showSecrets, ors: !showSecrets.ors})}
+                    >
+                      {showSecrets.ors ? "Hide" : "Show"}
+                    </Button>
+                  </div>
+                  <Input 
+                    id="ors-api-key" 
+                    type={showSecrets.ors ? "text" : "password"}
+                    defaultValue="5b3ce3597851110001cf62489d3650ef4f0f47a9b852b45571dc18ed" 
+                  />
                 </div>
-                <div className="flex items-center justify-between space-y-0 pt-2">
-                  <Label htmlFor="avoid-tolls">Avoid Toll Roads</Label>
-                  <Switch id="avoid-tolls" />
-                </div>
-                <div className="flex items-center justify-between space-y-0">
-                  <Label htmlFor="avoid-highways">Avoid Highways</Label>
-                  <Switch id="avoid-highways" />
-                </div>
-                <div className="flex items-center justify-between space-y-0">
-                  <Label htmlFor="real-time-traffic">Consider Real-time Traffic</Label>
-                  <Switch id="real-time-traffic" defaultChecked />
-                </div>
-                <div className="space-y-2 pt-2">
-                  <Label>Max Route Duration (hours)</Label>
-                  <Input type="number" defaultValue="8" />
+                <div className="space-y-2">
+                  <Label htmlFor="backend-port">Backend Port</Label>
+                  <Input id="backend-port" type="number" defaultValue="5000" />
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex flex-col items-start gap-4">
+                <div className="text-sm text-muted-foreground">
+                  <strong>Note:</strong> These API keys and secrets should be kept confidential. 
+                  Only authorized personnel should have access to this page.
+                </div>
                 <Button>
                   <Save className="mr-2 h-4 w-4" />
-                  Save Optimization Settings
+                  Save API Settings
                 </Button>
               </CardFooter>
             </Card>
           </TabsContent>
+        
         </Tabs>
       </div>
   )
