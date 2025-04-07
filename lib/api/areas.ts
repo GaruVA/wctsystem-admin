@@ -34,6 +34,19 @@ export interface AreaWithBins {
   };
 }
 
+// Interface for area status
+export interface AreaStatus {
+  _id: string;
+  name: string;
+  binCount: number;
+  averageFillLevel: number;
+  criticalBins: number;
+  wasteTypeCounts: Record<string, number>;
+  activeCollectors: number;
+  scheduledCollections: number;
+  status: 'critical' | 'warning' | 'normal';
+}
+
 // Get all areas with their bins
 export async function getAllAreasWithBins(): Promise<AreaWithBins[]> {
   try {
@@ -83,3 +96,62 @@ export async function getAreaWithBinsById(areaId: string): Promise<AreaWithBins>
     throw error;
   }
 }
+
+// Get area status overview
+export const getAreaStatusOverview = async (): Promise<AreaStatus[]> => {
+  try {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token missing');
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/analytics/area-status`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch area status data');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching area status overview:', error);
+    // Return mock data for development purposes
+    return [
+      {
+        _id: 'area1',
+        name: 'Wellawatte South',
+        binCount: 15,
+        averageFillLevel: 72,
+        criticalBins: 4,
+        wasteTypeCounts: {
+          GENERAL: 6,
+          ORGANIC: 4,
+          RECYCLE: 3,
+          HAZARDOUS: 2
+        },
+        activeCollectors: 2,
+        scheduledCollections: 3,
+        status: 'warning'
+      },
+      {
+        _id: 'area2',
+        name: 'Pamankada West',
+        binCount: 21,
+        averageFillLevel: 83,
+        criticalBins: 7,
+        wasteTypeCounts: {
+          GENERAL: 8,
+          ORGANIC: 5,
+          RECYCLE: 6,
+          HAZARDOUS: 2
+        },
+        activeCollectors: 1,
+        scheduledCollections: 2,
+        status: 'critical'
+      }
+    ];
+  }
+};

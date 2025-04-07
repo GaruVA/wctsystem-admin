@@ -11,9 +11,10 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import BinMap from "@/components/dashboard/bin-map";
-import { 
-  RefreshCcw, 
-  Trash2, 
+import { AreaStatusOverview } from "@/components/dashboard/area-status-overview";
+import {
+  RefreshCcw,
+  Trash2,
   Truck,
   ArrowUpRight,
   Percent,
@@ -25,7 +26,7 @@ import { getAllAreasWithBins, AreaWithBins, Bin } from "@/lib/api/areas";
 import { cn } from "@/lib/utils";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api", 
+  baseURL: "http://localhost:5000/api",
 });
 
 interface AnalyticsData {
@@ -57,7 +58,7 @@ export default function DashboardPage() {
   const [areasError, setAreasError] = useState<string | null>(null);
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  
+
   const [overallStats, setOverallStats] = useState({
     avgUtilization: 0,
     totalBins: 0,
@@ -115,13 +116,13 @@ export default function DashboardPage() {
       setError(null);
     } catch (err: any) {
       setError("Failed to fetch analytics data");
-      
+
       // Mock data for development
       setAnalytics({
-        "Area-001": { 
-          utilization: 78, 
-          collectionEfficiency: 92, 
-          serviceDelay: 12, 
+        "Area-001": {
+          utilization: 78,
+          collectionEfficiency: 92,
+          serviceDelay: 12,
           bins: 34,
           wasteTypeDistribution: {
             "GENERAL": 15,
@@ -130,10 +131,10 @@ export default function DashboardPage() {
             "HAZARDOUS": 4
           }
         },
-        "Area-002": { 
-          utilization: 65, 
-          collectionEfficiency: 87, 
-          serviceDelay: 18, 
+        "Area-002": {
+          utilization: 65,
+          collectionEfficiency: 87,
+          serviceDelay: 18,
           bins: 28,
           wasteTypeDistribution: {
             "GENERAL": 12,
@@ -142,10 +143,10 @@ export default function DashboardPage() {
             "HAZARDOUS": 3
           }
         },
-        "Area-003": { 
-          utilization: 83, 
-          collectionEfficiency: 95, 
-          serviceDelay: 8, 
+        "Area-003": {
+          utilization: 83,
+          collectionEfficiency: 95,
+          serviceDelay: 8,
           bins: 42,
           wasteTypeDistribution: {
             "GENERAL": 20,
@@ -202,7 +203,7 @@ export default function DashboardPage() {
         type: 'system'
       }
     ];
-    
+
     setAlerts(mockAlerts);
   };
 
@@ -229,7 +230,7 @@ export default function DashboardPage() {
   };
 
   const getAlertColor = (severity: string) => {
-    switch(severity) {
+    switch (severity) {
       case 'high': return 'text-red-500 bg-red-100';
       case 'medium': return 'text-amber-500 bg-amber-100';
       case 'low': return 'text-blue-500 bg-blue-100';
@@ -242,13 +243,13 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-2">
-          <Button 
+          <Button
             variant="outline"
             size="sm"
           >
             Export
           </Button>
-          <Button 
+          <Button
             size="sm"
             onClick={() => {
               fetchAnalytics();
@@ -352,33 +353,31 @@ export default function DashboardPage() {
                   <div className="mb-4 flex flex-wrap gap-2 px-6">
                     <button
                       onClick={() => setSelectedArea(null)}
-                      className={`px-3 py-1 text-sm rounded ${
-                        selectedArea === null
+                      className={`px-3 py-1 text-sm rounded ${selectedArea === null
                           ? 'bg-blue-600 text-white'
                           : 'bg-gray-200 hover:bg-gray-300'
-                      }`}
+                        }`}
                     >
                       All Areas ({areas.length})
                     </button>
-                    
+
                     {areas.map(area => (
                       <button
                         key={area.areaID}
                         onClick={() => setSelectedArea(area.areaID)}
-                        className={`px-3 py-1 text-sm rounded ${
-                          selectedArea === area.areaID
+                        className={`px-3 py-1 text-sm rounded ${selectedArea === area.areaID
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-200 hover:bg-gray-300'
-                        }`}
+                          }`}
                       >
                         {area.areaName} ({area.bins.length})
                       </button>
                     ))}
                   </div>
 
-                  <BinMap 
-                    areas={filteredAreas} 
-                    fitToAreas={true} 
+                  <BinMap
+                    areas={filteredAreas}
+                    fitToAreas={true}
                     onBinSelect={handleBinSelect}
                     selectedBin={selectedBin}
                     style={{ height: "395px" }}
@@ -434,6 +433,8 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+        {/* Area Status Overview */}
+        <AreaStatusOverview />
       </div>
     </div>
   );
