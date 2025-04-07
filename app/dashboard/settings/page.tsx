@@ -82,9 +82,8 @@ export default function SettingsPage() {
   });
 
   // Area to reassign bins and collectors to when deleting an area
-  const [reassignAreaId, setReassignAreaId] = useState<string>("");
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [areaToDelete, setAreaToDelete] = useState<string>("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Fetch all areas on component mount
   useEffect(() => {
@@ -149,7 +148,6 @@ export default function SettingsPage() {
 
   const handleOpenDeleteDialog = (areaId: string) => {
     setAreaToDelete(areaId);
-    setReassignAreaId("");
     setIsDeleteDialogOpen(true);
   };
 
@@ -267,20 +265,16 @@ export default function SettingsPage() {
   const handleDeleteArea = async () => {
     try {
       const token = localStorage.getItem('adminToken');
-      const requestOptions: RequestInit = {
+      const url = `http://localhost:5000/api/areas/${areaToDelete}`;
+      
+      const response = await fetch(url, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         }
-      };
-
-      // If reassignment area is selected, add it to request body
-      if (reassignAreaId) {
-        requestOptions.body = JSON.stringify({ reassignToAreaId: reassignAreaId });
-      }
-
-      const response = await fetch(`http://localhost:5000/api/areas/${areaToDelete}`, requestOptions);
+        // No body is needed now, as we always unassign
+      });
       
       if (!response.ok) {
         throw new Error('Failed to delete area');
@@ -288,9 +282,7 @@ export default function SettingsPage() {
       
       toast({
         title: "Success",
-        description: reassignAreaId 
-          ? "Area deleted successfully and resources reassigned" 
-          : "Area deleted successfully"
+        description: "Area deleted successfully and resources unassigned"
       });
       
       setIsDeleteDialogOpen(false);
@@ -352,10 +344,6 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="system-name">System Name</Label>
                   <Input id="system-name" defaultValue="WCT Waste Collection System" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="organization-name">Organization Name</Label>
-                  <Input id="organization-name" defaultValue="City Waste Management Department" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="admin-email">Admin Email</Label>
@@ -676,48 +664,15 @@ export default function SettingsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Delete Area Dialog with Reassignment Option */}
+        {/* Delete Area Dialog - Simplified */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <DialogContent className="sm:max-w-[525px]">
             <DialogHeader>
               <DialogTitle>Delete Area</DialogTitle>
               <DialogDescription>
-                This will permanently delete the area. Any bins and collectors assigned to this area can be reassigned.
+                This will permanently delete the area. All bins and collectors will be unassigned and will need to be reassigned later.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="reassign-area">Reassign Resources (Optional)</Label>
-                <Select 
-                  value={reassignAreaId} 
-                  onValueChange={(value) => setReassignAreaId(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an area to reassign resources" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Don't reassign resources</SelectItem>
-                    {areas
-                      .filter(area => area._id !== areaToDelete)
-                      .map(area => (
-                        <SelectItem key={area._id} value={area._id}>{area.name}</SelectItem>
-                      ))
-                    }
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-start space-x-2 pt-2">
-                <AlertCircle className="h-4 w-4 mt-0.5 text-amber-500" />
-                <div className="text-sm text-muted-foreground">
-                  {reassignAreaId ? (
-                    <p>All bins and collectors from this area will be reassigned to the selected area.</p>
-                  ) : (
-                    <p>Bins and collectors will be unassigned. You'll need to manually assign them to areas later.</p>
-                  )}
-                </div>
-              </div>
-            </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
               <Button variant="destructive" onClick={handleDeleteArea}>Delete Area</Button>
