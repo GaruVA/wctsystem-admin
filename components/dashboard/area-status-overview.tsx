@@ -9,29 +9,9 @@ import {
   CardTitle 
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle, AlertTriangle, Trash2, Recycle, Leaf, AlertOctagon, MapPin } from 'lucide-react';
 import axios from 'axios';
-
-// Custom Badge component since we don't have the shadcn/ui one
-const Badge = ({ 
-  children, 
-  variant = 'default',
-  className = '' 
-}: { 
-  children: React.ReactNode, 
-  variant?: 'default' | 'outline', 
-  className?: string 
-}) => {
-  return (
-    <span className={`
-      inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold
-      transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2
-      ${className}
-    `}>
-      {children}
-    </span>
-  );
-};
 
 interface AreaStatus {
   _id: string;
@@ -43,8 +23,8 @@ interface AreaStatus {
   activeCollectors: number;
   scheduledCollections: number;
   status: 'critical' | 'warning' | 'normal';
-  lastCollection?: string; // Added for the new UI
-  nextScheduled?: string; // Added for the new UI
+  lastCollection?: string;
+  nextScheduled?: string;
 }
 
 const api = axios.create({
@@ -174,8 +154,8 @@ export function AreaStatusOverview() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Zone Status Overview</CardTitle>
-          <CardDescription>Current collection status by zone</CardDescription>
+          <CardTitle>Area Status Overview</CardTitle>
+          <CardDescription>Current collection status by area</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -206,8 +186,8 @@ export function AreaStatusOverview() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Zone Status Overview</CardTitle>
-          <CardDescription>Current collection status by zone</CardDescription>
+          <CardTitle>Area Status Overview</CardTitle>
+          <CardDescription>Current collection status by area</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center p-6 text-red-500">
@@ -222,8 +202,8 @@ export function AreaStatusOverview() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-2xl">Zone Status Overview</CardTitle>
-        <CardDescription>Current collection status by zone</CardDescription>
+        <CardTitle>Area Status Overview</CardTitle>
+        <CardDescription>Current collection status by area</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -234,17 +214,15 @@ export function AreaStatusOverview() {
               <div key={area._id} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium">{area.name}</h3>
-                  <Badge className={badgeColor}>
+                  <Badge 
+                    variant="outline" 
+                    className={badgeColor}
+                  >
                     {Math.round(area.averageFillLevel)}% Avg
                   </Badge>
                 </div>
                 
-                <div className="mt-2 h-2">
-                  <Progress 
-                    value={area.averageFillLevel} 
-                    className="h-2"
-                  />
-                </div>
+                <Progress value={area.averageFillLevel} className="mt-2 h-2" />
                 
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                   <div>
