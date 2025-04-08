@@ -261,19 +261,29 @@ export default function SchedulePage() {
       let distance = 0;
       let duration = 0;
       
+      // Handle distance - already in km from our backend calculation
       if (typeof routeData.distance === 'number') {
-        distance = routeData.distance / 1000; // Convert to km
+        distance = routeData.distance;
       } else if (typeof routeData.distance === 'string') {
+        // For string format (fallback)
         const match = routeData.distance.match(/(\d+(\.\d+)?)/);
         distance = match ? parseFloat(match[0]) : 0;
       }
       
+      // Handle duration - already in minutes from our backend calculation
       if (typeof routeData.duration === 'number') {
-        duration = Math.round(routeData.duration / 60); // Convert to minutes
+        duration = routeData.duration;
       } else if (typeof routeData.duration === 'string') {
+        // For string format (fallback)
         const match = routeData.duration.match(/(\d+(\.\d+)?)/);
         duration = match ? parseFloat(match[0]) : 0;
       }
+      
+      // Apply minimum values to prevent 0 km or 0 minutes display
+      distance = Math.max(0.1, distance);
+      duration = Math.max(1, duration);
+      
+      console.log("Parsed route metrics:", { distance, duration });
       
       // Use area's defined start and end locations directly
       const startCoordinates = selectedAreaData.startLocation ? 
