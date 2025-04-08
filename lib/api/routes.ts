@@ -133,28 +133,6 @@ export async function saveRouteSchedule(scheduleData: any): Promise<any> {
 }
 
 /**
- * Get all saved route schedules
- */
-export async function getAllSchedules(): Promise<any[]> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/schedules`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch schedules: ${response.status} ${response.statusText}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching schedules:', error);
-    throw error;
-  }
-}
-
-/**
  * Adjust an existing route by adding/removing bins or reordering them
  */
 export async function adjustExistingRoute(
