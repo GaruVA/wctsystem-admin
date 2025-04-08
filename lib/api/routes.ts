@@ -22,31 +22,32 @@ export interface RouteStep {
   };
 }
 
-// Interface for bin scheduling flags
-export interface BinScheduleOptions {
-  includeIds?: string[]; // Bin IDs to include regardless of fill level
-  excludeIds?: string[]; // Bin IDs to exclude regardless of fill level
-  fillLevelThreshold?: number; // Override default threshold (default: 70%)
+// Interface for bin scheduling parameters
+export interface RouteParameters {
+  fillLevelThreshold: number;     // Fill level threshold (default: 70%)
+  wasteType?: string;             // Filter by waste type (GENERAL, ORGANIC, etc.)
+  includeCriticalBins?: boolean;  // Include all bins ≥90% full regardless of waste type
 }
 
 /**
  * Get optimized route for a specific area
  */
-export async function getOptimizedRoute(areaId: string, options?: BinScheduleOptions): Promise<any> {
+export async function getOptimizedRoute(areaId: string, parameters: RouteParameters): Promise<any> {
   try {
-    // Build query params for include/exclude bins and threshold
+    // Build query params for route parameters
     const queryParams = new URLSearchParams();
     
-    if (options?.includeIds?.length) {
-      queryParams.append('include', options.includeIds.join(','));
+    // Always include the threshold
+    queryParams.append('threshold', parameters.fillLevelThreshold.toString());
+    
+    // Add waste type filter if specified
+    if (parameters.wasteType && parameters.wasteType !== 'ALL') {
+      queryParams.append('wasteType', parameters.wasteType);
     }
     
-    if (options?.excludeIds?.length) {
-      queryParams.append('exclude', options.excludeIds.join(','));
-    }
-    
-    if (options?.fillLevelThreshold !== undefined) {
-      queryParams.append('threshold', options.fillLevelThreshold.toString());
+    // Add critical bins flag if true
+    if (parameters.includeCriticalBins) {
+      queryParams.append('includeCritical', 'true');
     }
     
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';

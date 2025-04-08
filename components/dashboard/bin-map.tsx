@@ -380,7 +380,7 @@ const BinMap: React.FC<BinMapProps> = ({
           L.marker([area.startLocation.coordinates[1], area.startLocation.coordinates[0]], {
             icon: L.divIcon({
               className: 'start-marker',
-              html: `<div style="width:12px;height:12px;border-radius:50%;background-color:green;border:2px solid white;"></div>`,
+              html: `<div style="width:14px;height:14px;border-radius:50%;background-color:green;border:2px solid white;"></div>`,
               iconSize: [12, 12],
               iconAnchor: [6, 6]
             })
@@ -392,7 +392,7 @@ const BinMap: React.FC<BinMapProps> = ({
           L.marker([area.endLocation.coordinates[1], area.endLocation.coordinates[0]], {
             icon: L.divIcon({
               className: 'end-marker',
-              html: `<div style="width:12px;height:12px;border-radius:50%;background-color:red;border:2px solid white;"></div>`,
+              html: `<div style="width:14px;height:14px;border-radius:50%;background-color:blue;border:2px solid white;"></div>`,
               iconSize: [12, 12],
               iconAnchor: [6, 6]
             })

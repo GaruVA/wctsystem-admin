@@ -60,8 +60,8 @@ import {
   generateCustomRoute, 
   saveRouteSchedule,
   adjustExistingRoute, 
-  BinScheduleOptions, 
-  OptimizedRoute 
+  OptimizedRoute,
+  RouteParameters
 } from "@/lib/api/routes";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -187,43 +187,18 @@ export default function SchedulePage() {
     setError(null);
     
     try {
-      // Prepare optimization options
-      const options: BinScheduleOptions = {
-        fillLevelThreshold: fillThreshold
+      // Prepare route parameters using the new interface
+      const parameters: RouteParameters = {
+        fillLevelThreshold: fillThreshold,
+        wasteType: wasteTypeFilter,
+        includeCriticalBins: includeAllCritical
       };
       
-      // Include critical bins if the option is checked
-      if (includeAllCritical) {
-        const criticalBins = areas
-          .find(area => area.areaID === selectedArea)
-          ?.bins.filter(bin => bin.fillLevel >= 90)
-          .map(bin => bin._id);
-        
-        if (criticalBins && criticalBins.length > 0) {
-          options.includeIds = criticalBins;
-        }
-      }
+      // Call API to get optimized route with new parameters
+      const optimizedRoute = await getOptimizedRoute(selectedArea, parameters);
       
-      // Filter by waste types if any are selected
-      if (wasteTypeFilter !== "ALL") {
-        const selectedBins = areas
-          .find(area => area.areaID === selectedArea)
-          ?.bins.filter(bin => bin.wasteTypes === wasteTypeFilter)
-          .map(bin => bin._id);
-        
-        if (selectedBins && selectedBins.length > 0) {
-          options.includeIds = options.includeIds 
-            ? [...new Set([...options.includeIds, ...selectedBins])]
-            : selectedBins;
-        }
-      }
-      
-      // Call API to get optimized route
-      const optimizedRoute = await getOptimizedRoute(selectedArea, options);
-      
-      // In development, we'll use mock data if API fails
       if (!optimizedRoute) {
-        throw new Error("Failed to generate route");
+        throw new Error("Failed to generate route - no response from API");
       }
       
       console.log("Received route data:", optimizedRoute);
@@ -250,7 +225,7 @@ export default function SchedulePage() {
       
       // Store the actual route polyline coordinates
       const routePolyline = optimizedRoute.route && optimizedRoute.route.geometry ? 
-        optimizedRoute.route.geometry.coordinates.map(coord => [coord[0], coord[1]] as [number, number]) :
+        optimizedRoute.route.geometry.coordinates.map((coord: [number, number]) => [coord[0], coord[1]] as [number, number]) :
         routeData.route;
       
       // Create bins sequence with extended data
@@ -300,17 +275,12 @@ export default function SchedulePage() {
         duration = match ? parseFloat(match[0]) : 0;
       }
       
-      // Depot location (default coordinates or calculate from area)
-      const calculateCenterCoordinates = (area: AreaWithBins): [number, number] => {
-        if (area.startLocation && area.startLocation.coordinates) {
-          return area.startLocation.coordinates;
-        }
-        
-        // If no coordinates found, use default for Colombo
-        return [79.861, 6.927];
-      }
+      // Use area's defined start and end locations directly
+      const startCoordinates = selectedAreaData.startLocation ? 
+        selectedAreaData.startLocation.coordinates : [79.861, 6.927]; // Default to Colombo if missing
       
-      const depotCoordinates = calculateCenterCoordinates(selectedAreaData);
+      const endCoordinates = selectedAreaData.endLocation ? 
+        selectedAreaData.endLocation.coordinates : startCoordinates; // Default to start location if missing
       
       // Create route object
       const route: RouteData = {
@@ -326,14 +296,14 @@ export default function SchedulePage() {
         totalDistance: distance,
         estimatedDuration: duration,
         startLocation: { 
-          lat: depotCoordinates[1], 
-          lng: depotCoordinates[0], 
+          lat: startCoordinates[1], 
+          lng: startCoordinates[0], 
           name: "Depot" 
         },
         endLocation: { 
-          lat: depotCoordinates[1], 
-          lng: depotCoordinates[0], 
-          name: "Depot" 
+          lat: endCoordinates[1], 
+          lng: endCoordinates[0], 
+          name: "Disposal Facility" // Better name for end location
         },
         routePolyline: routePolyline // Store the actual route polyline
       };
@@ -341,66 +311,10 @@ export default function SchedulePage() {
       setCurrentRoute(route);
     } catch (err) {
       console.error('Error generating route:', err);
-      setError('Failed to generate route. Please try again.');
-      
-      // For development, create a mock route
-      createMockRoute();
+      setError('Failed to generate route. Please check console for details.');
     } finally {
       setIsGeneratingRoute(false);
     }
-  };
-  
-  // Create a mock route for development
-  const createMockRoute = () => {
-    const selectedAreaData = areas.find(area => area.areaID === selectedArea);
-    
-    if (!selectedAreaData) {
-      return;
-    }
-    
-    // Filter bins based on fill level threshold
-    const eligibleBins = selectedAreaData.bins.filter(
-      bin => bin.fillLevel >= fillThreshold
-    );
-    
-    // Get depot coordinates using the area's startLocation instead of centerCoordinates
-    const depotCoordinates = selectedAreaData.startLocation?.coordinates || 
-      [79.861, 6.927]; // Default to Colombo
-    
-    // Random distance and duration
-    const distance = Math.round((eligibleBins.length * 0.5) * 10) / 10;
-    const duration = Math.round(eligibleBins.length * 15);
-    
-    // Create mock route with eligible bins
-    const mockRoute: RouteData = {
-      name: scheduleName || `Route for ${selectedAreaData.areaName}`,
-      createdAt: new Date().toISOString(),
-      status: 'scheduled',
-      bins: eligibleBins.map((bin, index) => ({ 
-        ...bin, 
-        sequenceNumber: index + 1,
-        estimatedArrival: new Date(Date.now() + (30 * 60 * 1000) * index).toISOString()
-      })),
-      collector: collectors.find(c => c.id === selectedCollector) || collectors[0],
-      area: {
-        id: selectedAreaData.areaID,
-        name: selectedAreaData.areaName
-      },
-      totalDistance: distance,
-      estimatedDuration: duration,
-      startLocation: { 
-        lat: depotCoordinates[1], 
-        lng: depotCoordinates[0], 
-        name: "Depot" 
-      },
-      endLocation: { 
-        lat: depotCoordinates[1], 
-        lng: depotCoordinates[0], 
-        name: "Depot" 
-      }
-    };
-    
-    setCurrentRoute(mockRoute);
   };
   
   // Handle bin reordering in edit mode
@@ -806,6 +720,8 @@ export default function SchedulePage() {
                             onBinSelect={handleBinSelect}
                             selectedBin={selectedBin}
                             style={{ height: "500px" }}
+                            singleArea={areas.find(area => area.areaID === selectedArea)}
+                            fitToRoute={true}
                           />
                         </div>
                       </TabsContent>
