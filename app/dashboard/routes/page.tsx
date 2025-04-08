@@ -127,6 +127,9 @@ export default function SchedulePage() {
   const [availableBins, setAvailableBins] = useState<Bin[]>([]);
   const [selectedBinsToAdd, setSelectedBinsToAdd] = useState<string[]>([]);
 
+  // State for UI flow
+  const [showAssignment, setShowAssignment] = useState<boolean>(false);
+
   // Load areas and collectors on component mount
   useEffect(() => {
     fetchAreas();
@@ -332,6 +335,7 @@ export default function SchedulePage() {
       };
       
       setCurrentRoute(route);
+      setShowAssignment(true); // Show assignment card after route is generated
     } catch (err) {
       console.error('Error generating route:', err);
       setError('Failed to generate route. Please check console for details.');
@@ -430,6 +434,14 @@ export default function SchedulePage() {
     }
   };
   
+  // Handle going back to route parameters
+  const handleGoBack = () => {
+    setShowAssignment(false);
+    setCurrentRoute(null);
+    setSelectedBin(null);
+    setEditMode(false);
+  };
+
   // Format route duration into human-readable time
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -543,18 +555,20 @@ export default function SchedulePage() {
               </Button>
             </>
           )}
-          <Button
-            size="sm"
-            onClick={generateRoute}
-            disabled={isGeneratingRoute}
-          >
-            {isGeneratingRoute ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RotateCcw className="mr-2 h-4 w-4" />
-            )}
-            Generate Route
-          </Button>
+          {!showAssignment && (
+            <Button
+              size="sm"
+              onClick={generateRoute}
+              disabled={isGeneratingRoute}
+            >
+              {isGeneratingRoute ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="mr-2 h-4 w-4" />
+              )}
+              Generate Route
+            </Button>
+          )}
         </div>
       </div>
 
@@ -568,117 +582,223 @@ export default function SchedulePage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Route Parameters Card */}
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings size={18} />
-              Route Parameters
-            </CardTitle>
-            <CardDescription>
-              Configure settings for route generation
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-3">
-              <Label>Route Name</Label>
-              <Input
-                value={scheduleName}
-                onChange={(e) => setScheduleName(e.target.value)}
-                placeholder="Enter a name for this route"
-              />
-            </div>
-            
-            <div className="space-y-3">
-              <Label>Collection Area</Label>
-              <Select value={selectedArea} onValueChange={setSelectedArea}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an area" />
-                </SelectTrigger>
-                <SelectContent>
-                  {areas.map((area) => (
-                    <SelectItem key={area.areaID} value={area.areaID}>
-                      {area.areaName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Minimum Fill Level Threshold</Label>
-                <span className="text-sm font-medium">{fillThreshold}%</span>
+        {/* Route Parameters Card - Only show when not in assignment mode */}
+        {!showAssignment && (
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings size={18} />
+                Route Parameters
+              </CardTitle>
+              <CardDescription>
+                Configure settings for route generation
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label>Route Name</Label>
+                <Input
+                  value={scheduleName}
+                  onChange={(e) => setScheduleName(e.target.value)}
+                  placeholder="Enter a name for this route"
+                />
               </div>
-              <Slider
-                value={[fillThreshold]}
-                min={0}
-                max={100}
-                step={5}
-                onValueChange={(value) => setFillThreshold(value[0])}
-              />
-              <p className="text-xs text-muted-foreground">
-                Only bins with fill level at or above this threshold will be included
-              </p>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="critical-bins"
-                checked={includeAllCritical}
-                onCheckedChange={(checked) => 
-                  setIncludeAllCritical(checked === true)
-                }
-              />
-              <Label htmlFor="critical-bins">
-                Include all critical bins (≥ 90%) regardless of other filters
-              </Label>
-            </div>
-            
-            <div className="space-y-3">
-              <Label>Waste Types</Label>
-              <RadioGroup
-                value={wasteTypeFilter}
-                defaultValue="GENERAL"
-                onValueChange={setWasteTypeFilter}
-                className="flex flex-col space-y-2"
+              
+              <div className="space-y-3">
+                <Label>Collection Area</Label>
+                <Select value={selectedArea} onValueChange={setSelectedArea}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an area" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {areas.map((area) => (
+                      <SelectItem key={area.areaID} value={area.areaID}>
+                        {area.areaName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Minimum Fill Level Threshold</Label>
+                  <span className="text-sm font-medium">{fillThreshold}%</span>
+                </div>
+                <Slider
+                  value={[fillThreshold]}
+                  min={0}
+                  max={100}
+                  step={5}
+                  onValueChange={(value) => setFillThreshold(value[0])}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Only bins with fill level at or above this threshold will be included
+                </p>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="critical-bins"
+                  checked={includeAllCritical}
+                  onCheckedChange={(checked) => 
+                    setIncludeAllCritical(checked === true)
+                  }
+                />
+                <Label htmlFor="critical-bins">
+                  Include all critical bins (≥ 90%) regardless of other filters
+                </Label>
+              </div>
+              
+              <div className="space-y-3">
+                <Label>Waste Types</Label>
+                <RadioGroup
+                  value={wasteTypeFilter}
+                  defaultValue="GENERAL"
+                  onValueChange={setWasteTypeFilter}
+                  className="flex flex-col space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="GENERAL" id="waste-type-general" />
+                    <Label htmlFor="waste-type-general">General</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="ORGANIC" id="waste-type-organic" />
+                    <Label htmlFor="waste-type-organic">Organic</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="RECYCLE" id="waste-type-recycle" />
+                    <Label htmlFor="waste-type-recycle">Recycle</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="HAZARDOUS" id="waste-type-hazardous" />
+                    <Label htmlFor="waste-type-hazardous">Hazardous</Label>
+                  </div>
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground">
+                  Select a waste type to filter bins
+                </p>
+              </div>
+              
+              <Button 
+                className="w-full" 
+                onClick={generateRoute} 
+                disabled={isGeneratingRoute}
               >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="GENERAL" id="waste-type-general" />
-                  <Label htmlFor="waste-type-general">General</Label>
+                {isGeneratingRoute ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Route className="mr-2 h-4 w-4" />
+                )}
+                Generate Optimized Route
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Route Assignment Card - Only show when in assignment mode */}
+        {showAssignment && currentRoute && (
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User size={18} />
+                Route Assignment
+              </CardTitle>
+              <CardDescription>
+                Assign this route to a waste collector
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label>Assign Collector</Label>
+                <Select value={selectedCollector} onValueChange={setSelectedCollector}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select collector" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {collectors.filter(c => c.status === 'active').map((collector) => (
+                      <SelectItem key={collector._id} value={collector._id}>
+                        {collector.firstName ? `${collector.firstName} ${collector.lastName || ''}` : collector.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Schedule Date</Label>
+                <Input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-3">
+                <Label>Start Time</Label>
+                <Input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-3">
+                <Label>Notes (Optional)</Label>
+                <textarea
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="Add any relevant notes for this route"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-3 pt-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Bins:</span>
+                  <span className="font-medium">{currentRoute.bins.length}</span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="ORGANIC" id="waste-type-organic" />
-                  <Label htmlFor="waste-type-organic">Organic</Label>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Route Distance:</span>
+                  <span className="font-medium">{currentRoute.totalDistance.toFixed(1)} km</span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="RECYCLE" id="waste-type-recycle" />
-                  <Label htmlFor="waste-type-recycle">Recycle</Label>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Estimated Duration:</span>
+                  <span className="font-medium">{formatDuration(currentRoute.estimatedDuration)}</span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="HAZARDOUS" id="waste-type-hazardous" />
-                  <Label htmlFor="waste-type-hazardous">Hazardous</Label>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Average Fill Level:</span>
+                  <span className="font-medium">
+                    {Math.round(
+                      currentRoute.bins.reduce((sum, bin) => sum + bin.fillLevel, 0) / 
+                      currentRoute.bins.length
+                    )}%
+                  </span>
                 </div>
-              </RadioGroup>
-              <p className="text-xs text-muted-foreground">
-                Select a waste type to filter bins
-              </p>
-            </div>
-            
-            <Button 
-              className="w-full" 
-              onClick={generateRoute} 
-              disabled={isGeneratingRoute}
-            >
-              {isGeneratingRoute ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Route className="mr-2 h-4 w-4" />
-              )}
-              Generate Optimized Route
-            </Button>
-          </CardContent>
-        </Card>
+              </div>
+              
+              <div className="space-y-3 pt-3">
+                <Button 
+                  className="w-full" 
+                  onClick={saveRoute}
+                  disabled={!selectedCollector || isGeneratingRoute}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Save & Dispatch Route
+                </Button>
+                
+                <Button 
+                  className="w-full" 
+                  variant="outline"
+                  onClick={handleGoBack}
+                >
+                  <ChevronRight className="mr-2 h-4 w-4 rotate-180" />
+                  Go Back to Parameters
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Route Display Area */}
         <div className="md:col-span-2 space-y-6">
@@ -705,7 +825,7 @@ export default function SchedulePage() {
                       <Truck size={18} />
                       {currentRoute.name}
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="mt-1.5">
                       {currentRoute.area.name} • {currentRoute.bins.length} stops • 
                       {formatDuration(currentRoute.estimatedDuration)} • 
                       {currentRoute.totalDistance.toFixed(1)} km
@@ -725,266 +845,187 @@ export default function SchedulePage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {/* Route visualization and assignment combined in one container */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Map and list tabs - takes 2/3 width on large screens */}
-                  <div className="lg:col-span-2">
-                    <Tabs defaultValue="map" value={activeTab} onValueChange={setActiveTab}>
-                      <TabsList className="grid grid-cols-2 mb-4">
-                        <TabsTrigger value="map" className="flex items-center gap-2">
-                          <MapIcon size={16} />
-                          Map View
-                        </TabsTrigger>
-                        <TabsTrigger value="list" className="flex items-center gap-2">
-                          <List size={16} />
-                          Sequence View
-                        </TabsTrigger>
-                      </TabsList>
+                <Tabs defaultValue="map" value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="grid grid-cols-2 mb-4">
+                    <TabsTrigger value="map" className="flex items-center gap-2">
+                      <MapIcon size={16} />
+                      Map View
+                    </TabsTrigger>
+                    <TabsTrigger value="list" className="flex items-center gap-2">
+                      <List size={16} />
+                      Sequence View
+                    </TabsTrigger>
+                  </TabsList>
 
-                      {/* Map View Tab */}
-                      <TabsContent value="map" className="m-0">
-                        <div className="h-[500px] rounded-md overflow-hidden">
-                          <BinMap
-                            bins={currentRoute.bins}
-                            optimizedRoute={currentRoute.routePolyline || currentRoute.bins.map(bin => 
-                              [bin.location.coordinates[0], bin.location.coordinates[1]] as [number, number]
-                            )}
-                            onBinSelect={handleBinSelect}
-                            selectedBin={selectedBin}
-                            style={{ height: "500px" }}
-                            singleArea={areas.find(area => area.areaID === selectedArea)}
-                            fitToRoute={true}
-                          />
+                  {/* Map View Tab */}
+                  <TabsContent value="map" className="m-0">
+                    <div className="h-[500px] rounded-md overflow-hidden">
+                      <BinMap
+                        bins={currentRoute.bins}
+                        optimizedRoute={currentRoute.routePolyline || currentRoute.bins.map(bin => 
+                          [bin.location.coordinates[0], bin.location.coordinates[1]] as [number, number]
+                        )}
+                        onBinSelect={handleBinSelect}
+                        selectedBin={selectedBin}
+                        style={{ height: "500px" }}
+                        singleArea={areas.find(area => area.areaID === selectedArea)}
+                        fitToRoute={true}
+                      />
+                    </div>
+                  </TabsContent>
+
+                  {/* List View Tab */}
+                  <TabsContent value="list" className="m-0">
+                    <div>
+                      <h3 className="text-lg font-medium mb-2">Route Sequence</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {editMode 
+                          ? "Drag and drop to reorder bins in the route" 
+                          : "Collection sequence with estimated arrival times"}
+                      </p>
+                      <div className="space-y-2">
+                        {/* Start Location */}
+                        <div className="flex items-center p-3 border border-green-200 bg-green-50 rounded-md">
+                          <div className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full mr-3">
+                            <MapPin size={16} />
+                          </div>
+                          <div className="flex-grow">
+                            <p className="font-medium">Start: {currentRoute.startLocation.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
                         </div>
-                      </TabsContent>
 
-                      {/* List View Tab */}
-                      <TabsContent value="list" className="m-0">
-                        <div>
-                          <h3 className="text-lg font-medium mb-2">Route Sequence</h3>
-                          <p className="text-sm text-muted-foreground mb-4">
-                            {editMode 
-                              ? "Drag and drop to reorder bins in the route" 
-                              : "Collection sequence with estimated arrival times"}
-                          </p>
-                          <div className="space-y-2">
-                            {/* Start Location */}
-                            <div className="flex items-center p-3 border border-green-200 bg-green-50 rounded-md">
-                              <div className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full mr-3">
-                                <MapPin size={16} />
+                        {/* Bin Sequence */}
+                        {currentRoute.bins.map((bin, index) => (
+                          <div 
+                            key={bin._id}
+                            className={cn(
+                              "flex items-center p-3 border rounded-md transition-all",
+                              editMode ? "cursor-move hover:bg-gray-50" : "",
+                              selectedBin && selectedBin._id === bin._id ? "border-blue-300 bg-blue-50" : "border-gray-200"
+                            )}
+                            onClick={() => handleBinSelect(bin)}
+                            draggable={editMode}
+                            onDragStart={(e) => {
+                              if (editMode) {
+                                e.dataTransfer.setData('text/plain', String(index));
+                              }
+                            }}
+                            onDragOver={(e) => {
+                              if (editMode) {
+                                e.preventDefault();
+                              }
+                            }}
+                            onDrop={(e) => {
+                              if (editMode) {
+                                e.preventDefault();
+                                const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                                handleBinReorder(sourceIndex, index);
+                              }
+                            }}
+                          >
+                            {editMode && (
+                              <MoveVertical size={16} className="text-gray-400 mr-2" />
+                            )}
+                            <div className="flex items-center justify-center w-8 h-8 bg-gray-200 text-gray-700 rounded-full mr-3">
+                              {bin.sequenceNumber}
+                            </div>
+                            <div className="flex-grow">
+                              <div className="flex justify-between items-start">
+                                <p className="font-medium">{bin._id}</p>
+                                <Badge variant="outline" className="ml-2">
+                                  {bin.wasteTypes.charAt(0) + bin.wasteTypes.slice(1).toLowerCase()}
+                                </Badge>
                               </div>
-                              <div className="flex-grow">
-                                <p className="font-medium">Start: {currentRoute.startLocation.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleTimeString([], {
+                              <p className="text-xs text-muted-foreground">{bin.address}</p>
+                              <div className="flex items-center mt-1">
+                                <div 
+                                  className={`w-2 h-2 rounded-full mr-1 ${getFillLevelColorClass(bin.fillLevel)}`} 
+                                />
+                                <span className="text-xs">{bin.fillLevel}% Full</span>
+                                <div className="mx-2 text-gray-300">|</div>
+                                <Clock size={12} className="text-gray-500 mr-1" />
+                                <span className="text-xs">
+                                  {new Date(bin.estimatedArrival).toLocaleTimeString([], {
                                     hour: '2-digit',
                                     minute: '2-digit'
                                   })}
-                                </p>
+                                </span>
                               </div>
                             </div>
-
-                            {/* Bin Sequence */}
-                            {currentRoute.bins.map((bin, index) => (
-                              <div 
-                                key={bin._id}
-                                className={cn(
-                                  "flex items-center p-3 border rounded-md transition-all",
-                                  editMode ? "cursor-move hover:bg-gray-50" : "",
-                                  selectedBin && selectedBin._id === bin._id ? "border-blue-300 bg-blue-50" : "border-gray-200"
-                                )}
-                                onClick={() => handleBinSelect(bin)}
-                                draggable={editMode}
-                                onDragStart={(e) => {
-                                  if (editMode) {
-                                    e.dataTransfer.setData('text/plain', String(index));
-                                  }
-                                }}
-                                onDragOver={(e) => {
-                                  if (editMode) {
-                                    e.preventDefault();
-                                  }
-                                }}
-                                onDrop={(e) => {
-                                  if (editMode) {
-                                    e.preventDefault();
-                                    const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
-                                    handleBinReorder(sourceIndex, index);
-                                  }
-                                }}
-                              >
-                                {editMode && (
-                                  <MoveVertical size={16} className="text-gray-400 mr-2" />
-                                )}
-                                <div className="flex items-center justify-center w-8 h-8 bg-gray-200 text-gray-700 rounded-full mr-3">
-                                  {bin.sequenceNumber}
-                                </div>
-                                <div className="flex-grow">
-                                  <div className="flex justify-between items-start">
-                                    <p className="font-medium">{bin._id}</p>
-                                    <Badge variant="outline" className="ml-2">
-                                      {bin.wasteTypes.charAt(0) + bin.wasteTypes.slice(1).toLowerCase()}
-                                    </Badge>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground">{bin.address}</p>
-                                  <div className="flex items-center mt-1">
-                                    <div 
-                                      className={`w-2 h-2 rounded-full mr-1 ${getFillLevelColorClass(bin.fillLevel)}`} 
-                                    />
-                                    <span className="text-xs">{bin.fillLevel}% Full</span>
-                                    <div className="mx-2 text-gray-300">|</div>
-                                    <Clock size={12} className="text-gray-500 mr-1" />
-                                    <span className="text-xs">
-                                      {new Date(bin.estimatedArrival).toLocaleTimeString([], {
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                      })}
-                                    </span>
-                                  </div>
-                                </div>
-                                {editMode && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveBin(bin._id);
-                                    }}
-                                  >
-                                    <Trash2 size={16} />
-                                  </Button>
-                                )}
-                              </div>
-                            ))}
-
-                            {/* End Location */}
-                            <div className="flex items-center p-3 border border-blue-200 bg-blue-50 rounded-md">
-                              <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full mr-3">
-                                <MapPin size={16} />
-                              </div>
-                              <div className="flex-grow">
-                                <p className="font-medium">End: {currentRoute.endLocation.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  Estimated arrival: {new Date(
-                                    new Date(`${scheduleDate}T${scheduleTime}`).getTime() + currentRoute.estimatedDuration * 60000
-                                  ).toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Add bin button in edit mode */}
                             {editMode && (
                               <Button 
-                                variant="outline" 
-                                className="w-full mt-4 border-dashed"
-                                onClick={getAvailableBins}
+                                size="sm" 
+                                variant="ghost" 
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveBin(bin._id);
+                                }}
                               >
-                                <Plus size={16} className="mr-2" />
-                                Add Bin to Route
+                                <Trash2 size={16} />
                               </Button>
                             )}
                           </div>
-                        </div>
-                      </TabsContent>
-                    </Tabs>
-                  </div>
-                
-                  {/* Route Assignment Panel - takes 1/3 width on large screens */}
-                  <div className="lg:col-span-1">
-                    <div className="rounded-md border p-4">
-                      <h3 className="text-lg font-medium flex items-center gap-2 mb-2">
-                        <User size={18} />
-                        Route Assignment
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-5">
-                        Assign this route to a waste collector
-                      </p>
-                      <div className="space-y-6">
-                        <div className="space-y-3">
-                          <Label>Assign Collector</Label>
-                          <Select value={selectedCollector} onValueChange={setSelectedCollector}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select collector" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {collectors.filter(c => c.status === 'active').map((collector) => (
-                                <SelectItem key={collector._id} value={collector._id}>
-                                  {collector.firstName ? `${collector.firstName} ${collector.lastName || ''}` : collector.username}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        ))}
+
+                        {/* End Location */}
+                        <div className="flex items-center p-3 border border-blue-200 bg-blue-50 rounded-md">
+                          <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full mr-3">
+                            <MapPin size={16} />
+                          </div>
+                          <div className="flex-grow">
+                            <p className="font-medium">End: {currentRoute.endLocation.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Estimated arrival: {new Date(
+                                new Date(`${scheduleDate}T${scheduleTime}`).getTime() + currentRoute.estimatedDuration * 60000
+                              ).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
                         </div>
 
-                        <div className="space-y-3">
-                          <Label>Schedule Date</Label>
-                          <Input
-                            type="date"
-                            value={scheduleDate}
-                            onChange={(e) => setScheduleDate(e.target.value)}
-                          />
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <Label>Start Time</Label>
-                          <Input
-                            type="time"
-                            value={scheduleTime}
-                            onChange={(e) => setScheduleTime(e.target.value)}
-                          />
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <Label>Notes (Optional)</Label>
-                          <textarea
-                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            placeholder="Add any relevant notes for this route"
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                          />
-                        </div>
-
-                        <div className="space-y-3 pt-3">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Total Bins:</span>
-                            <span className="font-medium">{currentRoute.bins.length}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Route Distance:</span>
-                            <span className="font-medium">{currentRoute.totalDistance.toFixed(1)} km</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Estimated Duration:</span>
-                            <span className="font-medium">{formatDuration(currentRoute.estimatedDuration)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Average Fill Level:</span>
-                            <span className="font-medium">
-                              {Math.round(
-                                currentRoute.bins.reduce((sum, bin) => sum + bin.fillLevel, 0) / 
-                                currentRoute.bins.length
-                              )}%
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <Button 
-                          className="w-full mt-6" 
-                          onClick={saveRoute}
-                          disabled={!selectedCollector}
-                        >
-                          <Save className="mr-2 h-4 w-4" />
-                          Save & Dispatch Route
-                        </Button>
+                        {/* Add bin button in edit mode */}
+                        {editMode && (
+                          <Button 
+                            variant="outline" 
+                            className="w-full mt-4 border-dashed"
+                            onClick={getAvailableBins}
+                          >
+                            <Plus size={16} className="mr-2" />
+                            Add Bin to Route
+                          </Button>
+                        )}
                       </div>
                     </div>
-                  </div>
-                </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
+              {editMode && (
+                <CardFooter className="flex justify-between border-t pt-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setEditMode(false)}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Cancel Changes
+                  </Button>
+                  <Button 
+                    onClick={saveRoute}
+                    disabled={!selectedCollector}
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Route
+                  </Button>
+                </CardFooter>
+              )}
             </Card>
           )}
 
@@ -997,9 +1038,6 @@ export default function SchedulePage() {
                 <p className="text-muted-foreground mb-6">
                   Configure your parameters and generate a new collection route
                 </p>
-                <Button onClick={generateRoute}>
-                  Generate Route
-                </Button>
               </div>
             </Card>
           )}

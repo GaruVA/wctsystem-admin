@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils"
 import { 
   BarChart3, 
   LayoutDashboard, 
-  Route, 
+  Route,
+  CalendarClock, 
   Users, 
   Settings, 
   LogOut, 
@@ -34,7 +35,7 @@ export default function Sidebar({ className }: SidebarProps) {
     {
       name: "Schedule",
       path: "/dashboard/schedule",
-      icon: Route,
+      icon: CalendarClock,
     },
     {
       name: "Collectors",
