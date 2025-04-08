@@ -51,9 +51,18 @@ export async function getOptimizedRoute(areaId: string, options?: BinScheduleOpt
     
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
     
+    // Get token from localStorage
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token missing. Please log in again.');
+    }
+    
+    console.log(`Making request to: ${API_BASE_URL}/route-optimization/area/${areaId}${queryString}`);
+    
     const response = await fetch(`${API_BASE_URL}/route-optimization/area/${areaId}${queryString}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
     });
     
@@ -77,7 +86,7 @@ export async function generateCustomRoute(
   end: [number, number]
 ): Promise<OptimizedRoute> {
   try {
-    const response = await fetch(`${API_BASE_URL}/route-optimization/optimize`, {
+    const response = await fetch(`${API_BASE_URL}/route-optimization/custom`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -102,7 +111,7 @@ export async function generateCustomRoute(
  */
 export async function saveRouteSchedule(scheduleData: any): Promise<any> {
   try {
-    const response = await fetch(`${API_BASE_URL}/schedules`, {
+    const response = await fetch(`${API_BASE_URL}/route-optimization/assign`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

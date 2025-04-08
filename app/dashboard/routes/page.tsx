@@ -91,6 +91,7 @@ interface RouteData {
   estimatedDuration: number;
   startLocation: { lat: number; lng: number; name: string };
   endLocation: { lat: number; lng: number; name: string };
+  routePolyline?: [number, number][]; // Add the actual route polyline from ORS
 }
 
 export default function SchedulePage() {
@@ -103,7 +104,7 @@ export default function SchedulePage() {
   const [selectedArea, setSelectedArea] = useState<string>("");
   const [fillThreshold, setFillThreshold] = useState<number>(70);
   const [includeAllCritical, setIncludeAllCritical] = useState<boolean>(true);
-  const [wasteTypeFilter, setWasteTypeFilter] = useState<string>("ALL");
+  const [wasteTypeFilter, setWasteTypeFilter] = useState<string>("GENERAL");
   const [selectedCollector, setSelectedCollector] = useState<string>("");
   const [scheduleName, setScheduleName] = useState<string>("");
   const [scheduleDate, setScheduleDate] = useState<string>(
@@ -125,6 +126,11 @@ export default function SchedulePage() {
   const [activeTab, setActiveTab] = useState<string>("map");
   const [error, setError] = useState<string | null>(null);
   
+  // State for adding bins modal
+  const [showAddBinModal, setShowAddBinModal] = useState<boolean>(false);
+  const [availableBins, setAvailableBins] = useState<Bin[]>([]);
+  const [selectedBinsToAdd, setSelectedBinsToAdd] = useState<string[]>([]);
+
   // Load areas on component mount
   useEffect(() => {
     fetchAreas();
@@ -220,6 +226,8 @@ export default function SchedulePage() {
         throw new Error("Failed to generate route");
       }
       
+      console.log("Received route data:", optimizedRoute);
+      
       // Get selected area details
       const selectedAreaData = areas.find(area => area.areaID === selectedArea);
       
@@ -239,6 +247,11 @@ export default function SchedulePage() {
       // Parse the optimized route response
       const routeData: OptimizedRoute = optimizedRoute.route || optimizedRoute;
       const binSequence = optimizedRoute.binSequence || [];
+      
+      // Store the actual route polyline coordinates
+      const routePolyline = optimizedRoute.route && optimizedRoute.route.geometry ? 
+        optimizedRoute.route.geometry.coordinates.map(coord => [coord[0], coord[1]] as [number, number]) :
+        routeData.route;
       
       // Create bins sequence with extended data
       const selectedBins = binSequence.map((binId: string, index: number) => {
@@ -321,7 +334,8 @@ export default function SchedulePage() {
           lat: depotCoordinates[1], 
           lng: depotCoordinates[0], 
           name: "Depot" 
-        }
+        },
+        routePolyline: routePolyline // Store the actual route polyline
       };
       
       setCurrentRoute(route);
@@ -349,8 +363,8 @@ export default function SchedulePage() {
       bin => bin.fillLevel >= fillThreshold
     );
     
-    // Get random depot coordinates or use area center
-    const depotCoordinates = selectedAreaData.centerCoordinates || 
+    // Get depot coordinates using the area's startLocation instead of centerCoordinates
+    const depotCoordinates = selectedAreaData.startLocation?.coordinates || 
       [79.861, 6.927]; // Default to Colombo
     
     // Random distance and duration
@@ -496,6 +510,57 @@ export default function SchedulePage() {
     });
   };
 
+  // Function to retrieve available bins when the add bin modal is opened
+  const getAvailableBins = () => {
+    if (!selectedArea || !currentRoute) return;
+    
+    // Get the area data
+    const areaData = areas.find(area => area.areaID === selectedArea);
+    if (!areaData) return;
+    
+    // Get IDs of bins already in the route
+    const routeBinIds = new Set(currentRoute.bins.map(bin => bin._id));
+    
+    // Filter area bins to find ones not already in the route
+    const binsNotInRoute = areaData.bins.filter(bin => !routeBinIds.has(bin._id));
+    
+    setAvailableBins(binsNotInRoute);
+    setSelectedBinsToAdd([]);
+    setShowAddBinModal(true);
+  };
+  
+  // Handle adding selected bins to the route
+  const handleAddBinsToRoute = () => {
+    if (!currentRoute || selectedBinsToAdd.length === 0) return;
+    
+    // Get the area data
+    const areaData = areas.find(area => area.areaID === selectedArea);
+    if (!areaData) return;
+    
+    // Find the selected bins from the area
+    const binsToAdd = selectedBinsToAdd.map(binId => {
+      const bin = areaData.bins.find(b => b._id === binId);
+      return {
+        ...bin!,
+        sequenceNumber: currentRoute.bins.length + 1 + selectedBinsToAdd.indexOf(binId),
+        estimatedArrival: new Date(
+          new Date(currentRoute.bins[currentRoute.bins.length - 1]?.estimatedArrival || Date.now()).getTime() + 
+          (30 * 60 * 1000) * (1 + selectedBinsToAdd.indexOf(binId))
+        ).toISOString()
+      };
+    });
+    
+    // Update the route with the new bins
+    const updatedBins = [...currentRoute.bins, ...binsToAdd];
+    
+    setCurrentRoute({
+      ...currentRoute,
+      bins: updatedBins
+    });
+    
+    setShowAddBinModal(false);
+  };
+
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -628,6 +693,7 @@ export default function SchedulePage() {
               <Label>Waste Types</Label>
               <RadioGroup
                 value={wasteTypeFilter}
+                defaultValue="GENERAL"
                 onValueChange={setWasteTypeFilter}
                 className="flex flex-col space-y-2"
               >
@@ -734,7 +800,7 @@ export default function SchedulePage() {
                         <div className="h-[500px] rounded-md overflow-hidden">
                           <BinMap
                             bins={currentRoute.bins}
-                            optimizedRoute={currentRoute.bins.map(bin => 
+                            optimizedRoute={currentRoute.routePolyline || currentRoute.bins.map(bin => 
                               [bin.location.coordinates[0], bin.location.coordinates[1]] as [number, number]
                             )}
                             onBinSelect={handleBinSelect}
@@ -867,6 +933,7 @@ export default function SchedulePage() {
                               <Button 
                                 variant="outline" 
                                 className="w-full mt-4 border-dashed"
+                                onClick={getAvailableBins}
                               >
                                 <Plus size={16} className="mr-2" />
                                 Add Bin to Route
@@ -980,6 +1047,89 @@ export default function SchedulePage() {
           )}
         </div>
       </div>
+
+      {/* Add Bin Modal */}
+      {showAddBinModal && currentRoute && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg max-h-[80vh] flex flex-col">
+            <CardHeader>
+              <CardTitle>Add Bins to Route</CardTitle>
+              <CardDescription>
+                Select bins to add to the current route
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-grow overflow-auto">
+              {availableBins.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-muted-foreground">No more bins available to add from this area.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {availableBins.map(bin => (
+                    <div 
+                      key={bin._id}
+                      className={cn(
+                        "flex items-center p-3 border rounded-md hover:bg-gray-50",
+                        selectedBinsToAdd.includes(bin._id) ? "border-blue-300 bg-blue-50" : "border-gray-200"
+                      )}
+                      onClick={() => {
+                        if (selectedBinsToAdd.includes(bin._id)) {
+                          setSelectedBinsToAdd(selectedBinsToAdd.filter(id => id !== bin._id));
+                        } else {
+                          setSelectedBinsToAdd([...selectedBinsToAdd, bin._id]);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center justify-center mr-3">
+                        <Checkbox 
+                          checked={selectedBinsToAdd.includes(bin._id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedBinsToAdd([...selectedBinsToAdd, bin._id]);
+                            } else {
+                              setSelectedBinsToAdd(selectedBinsToAdd.filter(id => id !== bin._id));
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="flex-grow">
+                        <div className="flex justify-between items-start">
+                          <p className="font-medium">{bin._id}</p>
+                          <Badge variant="outline" className="ml-2">
+                            {bin.wasteTypes.charAt(0) + bin.wasteTypes.slice(1).toLowerCase()}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{bin.address}</p>
+                        <div className="flex items-center mt-1">
+                          <div 
+                            className={`w-2 h-2 rounded-full mr-1 ${getFillLevelColorClass(bin.fillLevel)}`} 
+                          />
+                          <span className="text-xs">{bin.fillLevel}% Full</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between border-t p-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAddBinModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddBinsToRoute}
+                disabled={selectedBinsToAdd.length === 0}
+              >
+                Add {selectedBinsToAdd.length} {selectedBinsToAdd.length === 1 ? 'Bin' : 'Bins'}
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
