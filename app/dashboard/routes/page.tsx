@@ -63,15 +63,10 @@ import {
   OptimizedRoute,
   RouteParameters
 } from "@/lib/api/routes";
+import { getAllCollectors, getActiveCollectors } from "@/lib/api/collectors";
+import { Collector } from "@/lib/types/collector";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-
-// Mock collectors data (will replace with API call)
-const mockCollectors = [
-  { id: "collector1", name: "John Smith", status: "active" },
-  { id: "collector2", name: "Maria Garcia", status: "active" },
-  { id: "collector3", name: "David Wong", status: "on-leave" },
-];
 
 interface RouteData {
   id?: string;
@@ -98,7 +93,7 @@ export default function SchedulePage() {
   // State for areas and collectors
   const [areas, setAreas] = useState<AreaWithBins[]>([]);
   const [areasLoading, setAreasLoading] = useState<boolean>(true);
-  const [collectors, setCollectors] = useState<any[]>(mockCollectors);
+  const [collectors, setCollectors] = useState<Collector[]>([]);
   
   // State for route parameters
   const [selectedArea, setSelectedArea] = useState<string>("");
@@ -117,6 +112,7 @@ export default function SchedulePage() {
       hour12: false
     })
   );
+  const [notes, setNotes] = useState<string>("");
   
   // State for route generation
   const [isGeneratingRoute, setIsGeneratingRoute] = useState<boolean>(false);
@@ -131,9 +127,10 @@ export default function SchedulePage() {
   const [availableBins, setAvailableBins] = useState<Bin[]>([]);
   const [selectedBinsToAdd, setSelectedBinsToAdd] = useState<string[]>([]);
 
-  // Load areas on component mount
+  // Load areas and collectors on component mount
   useEffect(() => {
     fetchAreas();
+    fetchCollectors();
   }, []);
   
   // Fetch all areas with bins
@@ -152,6 +149,22 @@ export default function SchedulePage() {
       setError('Failed to load areas data. Please try again later.');
     } finally {
       setAreasLoading(false);
+    }
+  };
+
+  // Fetch all active collectors
+  const fetchCollectors = async () => {
+    try {
+      const response = await getActiveCollectors();
+      if (response && response.collectors) {
+        setCollectors(response.collectors);
+      } else {
+        console.error('Invalid response format from getActiveCollectors');
+        setError('Failed to load collectors data. Invalid response format.');
+      }
+    } catch (err) {
+      console.error('Error fetching collectors:', err);
+      setError('Failed to load collectors data. Please try again later.');
     }
   };
   
@@ -212,7 +225,7 @@ export default function SchedulePage() {
       
       // Get selected collector
       const collector = selectedCollector 
-        ? collectors.find(c => c.id === selectedCollector) 
+        ? collectors.find(c => c._id === selectedCollector) 
         : collectors.find(c => c.status === 'active');
       
       if (!collector) {
@@ -378,17 +391,26 @@ export default function SchedulePage() {
     setError(null);
     
     try {
-      // Prepare schedule data
+      // Prepare schedule data matching the createSchedule endpoint structure
       const scheduleData = {
         name: currentRoute.name,
         areaId: currentRoute.area.id,
-        collectorId: currentRoute.collector.id,
-        routeId: "temp-route-id", // This would be generated on the backend
+        collectorId: selectedCollector, // Use the selected collector ID
         date: scheduleDate,
         startTime: new Date(`${scheduleDate}T${scheduleTime}`).toISOString(),
+        endTime: new Date(
+          new Date(`${scheduleDate}T${scheduleTime}`).getTime() + currentRoute.estimatedDuration * 60000
+        ).toISOString(),
         status: "scheduled",
-        binIds: currentRoute.bins.map(bin => bin._id)
+        notes: notes,
+        // Route data properties that match the backend Schedule model
+        route: currentRoute.routePolyline, // Send the coordinates as 'route'
+        distance: currentRoute.totalDistance, // Send distance value directly 
+        duration: currentRoute.estimatedDuration, // Send duration value directly
+        binSequence: currentRoute.bins.map(bin => bin._id) // Send bin IDs in sequence
       };
+      
+      console.log("Saving route with data:", scheduleData);
       
       // Save the route
       await saveRouteSchedule(scheduleData);
@@ -890,8 +912,8 @@ export default function SchedulePage() {
                             </SelectTrigger>
                             <SelectContent>
                               {collectors.filter(c => c.status === 'active').map((collector) => (
-                                <SelectItem key={collector.id} value={collector.id}>
-                                  {collector.name}
+                                <SelectItem key={collector._id} value={collector._id}>
+                                  {collector.firstName ? `${collector.firstName} ${collector.lastName || ''}` : collector.username}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -913,6 +935,16 @@ export default function SchedulePage() {
                             type="time"
                             value={scheduleTime}
                             onChange={(e) => setScheduleTime(e.target.value)}
+                          />
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <Label>Notes (Optional)</Label>
+                          <textarea
+                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            placeholder="Add any relevant notes for this route"
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
                           />
                         </div>
 
