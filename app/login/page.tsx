@@ -54,46 +54,50 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center space-x-2">
-            <ShieldAlert size={32} className="text-[#4285F4]" />
+      <Card className="w-full max-w-md shadow-lg border border-gray-200 bg-white">
+        <CardHeader className="space-y-2 pb-6">
+          <div className="flex items-center justify-center space-x-2 mb-2">
+            <ShieldAlert size={32} className="text-black" />
           </div>
-          <CardTitle className="text-2xl font-bold text-center text-[#202124]">WCTSystem Admin</CardTitle>
-          <CardDescription className="text-center text-[#202124]">
+          <CardTitle className="text-2xl font-bold text-center text-black">WCTSystem Admin</CardTitle>
+          <CardDescription className="text-center text-gray-500">
             Enter your credentials to access the admin panel
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
-            {error && <p className="text-red-500">{error}</p>}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
+                {error}
+              </div>
+            )}
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" className="text-black">Username</Label>
               <Input
                 id="username"
                 placeholder="admin"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
-                className="border-[#4285F4]"
+                className="border-gray-200 focus:border-black focus:ring-black"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-black">Password</Label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="border-[#4285F4]"
+                className="border-gray-200 focus:border-black focus:ring-black"
               />
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="pt-2">
             <Button
               type="submit"
-              className="w-full bg-[#34A853] hover:bg-[#2D9047] text-white"
+              className="w-full bg-black hover:bg-black/90 text-white"
               disabled={loading}
             >
               {loading ? 'Logging in...' : 'Login to Admin Panel'}
