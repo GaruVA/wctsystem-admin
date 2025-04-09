@@ -7,8 +7,62 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from "@/components/ui/card";
-import { Users, Search, UserPlus, Filter, X, Edit, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger
+} from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { 
+  Users, 
+  Search, 
+  UserPlus, 
+  Filter, 
+  MoreVertical, 
+  Edit, 
+  Trash2, 
+  UserCog, 
+  BarChart3, 
+  CheckCircle, 
+  Clock,
+  AlertCircle,
+  MapPin,
+  Trophy,
+} from "lucide-react";
 import { 
   getAllCollectors, 
   getActiveCollectors, 
@@ -20,6 +74,7 @@ import {
 } from "@/lib/api/collectors";
 import { getAllAreasWithBins } from "@/lib/api/areas";
 import { Collector, CollectorFormData, CollectorUpdateData } from "@/lib/types/collector";
+import { cn } from "@/lib/utils";
 
 export default function CollectorsPage() {
   const [collectors, setCollectors] = useState<Collector[]>([]);
@@ -28,13 +83,14 @@ export default function CollectorsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<string>("all");
   
-  // Modal states
-  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState<boolean>(false);
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
+  // Dialog states
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState<boolean>(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false);
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState<boolean>(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState<boolean>(false);
   
   // Selected collector for operations
   const [selectedCollector, setSelectedCollector] = useState<Collector | null>(null);
@@ -56,7 +112,15 @@ export default function CollectorsPage() {
       try {
         setLoading(true);
         const collectorsData = await getAllCollectors();
-        setCollectors(collectorsData);
+        
+        // Temporarily assign random efficiency values for development
+        // This should be replaced with actual API data in production
+        const collectorsWithEfficiency = collectorsData.map(collector => ({
+          ...collector,
+          efficiency: Math.floor(Math.random() * 41) + 60 // Random value between 60-100
+        }));
+        
+        setCollectors(collectorsWithEfficiency);
         
         // Also fetch areas for assigning collectors
         const areasData = await getAllAreasWithBins();
@@ -77,17 +141,24 @@ export default function CollectorsPage() {
     fetchData();
   }, []);
   
-  // Filter collectors based on search term and status
+  // Filter collectors based on search term, status, and active tab
   const filteredCollectors = collectors.filter(collector => {
     const matchesSearch = 
       collector.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       collector.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (collector.firstName && collector.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (collector.lastName && collector.lastName.toLowerCase().includes(searchTerm.toLowerCase()));
-      
+    
+    // Status filter always applies
     const matchesStatus = statusFilter === "all" || collector.status === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    // Tab filter
+    const matchesTab = 
+      activeTab === "all" || 
+      (activeTab === "assigned" && collector.area) || 
+      (activeTab === "unassigned" && !collector.area);
+    
+    return matchesSearch && matchesStatus && matchesTab;
   });
   
   // Handle form input changes
@@ -112,8 +183,8 @@ export default function CollectorsPage() {
     });
   };
   
-  // Open edit modal and populate form with selected collector data
-  const openEditModal = (collector: Collector) => {
+  // Open edit dialog and populate form with selected collector data
+  const openEditDialog = (collector: Collector) => {
     setSelectedCollector(collector);
     setCollectorFormData({
       username: collector.username,
@@ -124,26 +195,19 @@ export default function CollectorsPage() {
       phone: collector.phone || "",
       status: collector.status
     });
-    setIsEditModalOpen(true);
+    setIsEditDialogOpen(true);
   };
   
-  // Open add collector modal with fresh form
-  const openAddModal = () => {
-    // Make sure form is reset before opening add modal
-    resetFormData();
-    setIsAddModalOpen(true);
-  };
-  
-  // Open status change modal
-  const openStatusModal = (collector: Collector) => {
+  // Open status change dialog
+  const openStatusDialog = (collector: Collector) => {
     setSelectedCollector(collector);
-    setIsStatusModalOpen(true);
+    setIsStatusDialogOpen(true);
   };
   
-  // Open assign area modal
-  const openAssignModal = (collector: Collector) => {
+  // Open assign area dialog
+  const openAssignDialog = (collector: Collector) => {
     setSelectedCollector(collector);
-    setIsAssignModalOpen(true);
+    setIsAssignDialogOpen(true);
   };
   
   // Handle add collector form submission
@@ -155,10 +219,17 @@ export default function CollectorsPage() {
       
       // Refresh the collectors list
       const collectorsData = await getAllCollectors();
-      setCollectors(collectorsData);
       
-      // Close modal and reset form
-      setIsAddModalOpen(false);
+      // Add random efficiency for demo purposes
+      const collectorsWithEfficiency = collectorsData.map(collector => ({
+        ...collector,
+        efficiency: Math.floor(Math.random() * 41) + 60 // Random value between 60-100
+      }));
+      
+      setCollectors(collectorsWithEfficiency);
+      
+      // Close dialog and reset form
+      setIsAddDialogOpen(false);
       resetFormData();
       setError(null);
     } catch (err: any) {
@@ -189,10 +260,20 @@ export default function CollectorsPage() {
       
       // Refresh the collectors list
       const collectorsData = await getAllCollectors();
-      setCollectors(collectorsData);
       
-      // Close modal and reset
-      setIsEditModalOpen(false);
+      // Preserve efficiency values in the refresh
+      const updatedCollectors = collectorsData.map(collector => {
+        const existingCollector = collectors.find(c => c._id === collector._id);
+        return {
+          ...collector,
+          efficiency: existingCollector?.efficiency || Math.floor(Math.random() * 41) + 60
+        };
+      });
+      
+      setCollectors(updatedCollectors);
+      
+      // Close dialog and reset
+      setIsEditDialogOpen(false);
       setSelectedCollector(null);
       resetFormData();
       setError(null);
@@ -214,10 +295,20 @@ export default function CollectorsPage() {
       
       // Refresh the collectors list
       const collectorsData = await getAllCollectors();
-      setCollectors(collectorsData);
       
-      // Close modal and reset
-      setIsDeleteModalOpen(false);
+      // Preserve efficiency values in the refresh
+      const updatedCollectors = collectorsData.map(collector => {
+        const existingCollector = collectors.find(c => c._id === collector._id);
+        return {
+          ...collector,
+          efficiency: existingCollector?.efficiency || Math.floor(Math.random() * 41) + 60
+        };
+      });
+      
+      setCollectors(updatedCollectors);
+      
+      // Close dialog and reset
+      setIsDeleteDialogOpen(false);
       setSelectedCollector(null);
       setError(null);
     } catch (err: any) {
@@ -238,10 +329,20 @@ export default function CollectorsPage() {
       
       // Refresh the collectors list
       const collectorsData = await getAllCollectors();
-      setCollectors(collectorsData);
       
-      // Close modal and reset
-      setIsStatusModalOpen(false);
+      // Preserve efficiency values in the refresh
+      const updatedCollectors = collectorsData.map(collector => {
+        const existingCollector = collectors.find(c => c._id === collector._id);
+        return {
+          ...collector,
+          efficiency: existingCollector?.efficiency || Math.floor(Math.random() * 41) + 60
+        };
+      });
+      
+      setCollectors(updatedCollectors);
+      
+      // Close dialog and reset
+      setIsStatusDialogOpen(false);
       setSelectedCollector(null);
       setError(null);
     } catch (err: any) {
@@ -265,10 +366,20 @@ export default function CollectorsPage() {
       
       // Refresh the collectors list
       const collectorsData = await getAllCollectors();
-      setCollectors(collectorsData);
       
-      // Close modal and reset
-      setIsAssignModalOpen(false);
+      // Preserve efficiency values in the refresh
+      const updatedCollectors = collectorsData.map(collector => {
+        const existingCollector = collectors.find(c => c._id === collector._id);
+        return {
+          ...collector,
+          efficiency: existingCollector?.efficiency || Math.floor(Math.random() * 41) + 60
+        };
+      });
+      
+      setCollectors(updatedCollectors);
+      
+      // Close dialog and reset
+      setIsAssignDialogOpen(false);
       setSelectedCollector(null);
       setError(null);
     } catch (err: any) {
@@ -277,11 +388,6 @@ export default function CollectorsPage() {
     } finally {
       setLoading(false);
     }
-  };
-  
-  // Filter by status
-  const handleFilterChange = (status: string) => {
-    setStatusFilter(status);
   };
   
   // Format collector name
@@ -305,44 +411,63 @@ export default function CollectorsPage() {
         return "bg-gray-100 text-gray-800";
     }
   };
+  
+  // Get efficiency color based on percentage
+  const getEfficiencyColor = (efficiency: number | undefined) => {
+    if (!efficiency) return "bg-gray-500";
+    if (efficiency >= 90) return "bg-green-500";
+    if (efficiency >= 75) return "bg-blue-500";
+    if (efficiency >= 60) return "bg-amber-500";
+    return "bg-red-500";
+  };
+  
+  // Get efficiency label
+  const getEfficiencyLabel = (efficiency: number | undefined) => {
+    if (!efficiency) return "N/A";
+    if (efficiency >= 90) return "Excellent";
+    if (efficiency >= 75) return "Good";
+    if (efficiency >= 60) return "Average";
+    return "Poor";
+  };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Collector Management</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Collectors</h1>
         <div className="flex gap-3">
           <div className="relative">
             <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
+            <Input
               placeholder="Search collectors..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="pl-10 w-64 h-9"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={statusFilter}
-            onChange={(e) => handleFilterChange(e.target.value)}
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="on-leave">On Leave</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <button
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            onClick={openAddModal}
-          >
-            <UserPlus size={16} /> Add Collector
-          </button>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40 h-9">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="on-leave">On Leave</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size={"sm"} onClick={() => setIsAddDialogOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add Collector
+          </Button>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
-          <p>{error}</p>
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert">
+          <p className="flex items-center">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            {error}
+          </p>
         </div>
       )}
 
@@ -350,17 +475,47 @@ export default function CollectorsPage() {
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            <span>Collectors</span>
+            <span>Collector List</span>
           </CardTitle>
           <CardDescription>
-            Manage waste collection personnel
+            Manage waste collection personnel and view performance
           </CardDescription>
         </CardHeader>
+
+        <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="px-6">
+          <TabsList>
+            <TabsTrigger value="all">All Collectors</TabsTrigger>
+            <TabsTrigger value="assigned">Assigned</TabsTrigger>
+            <TabsTrigger value="unassigned">Unassigned</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         <CardContent>
-          {loading && <p className="text-center py-4">Loading collectors...</p>}
+          {loading && (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          )}
           
           {!loading && filteredCollectors.length === 0 && (
-            <p className="text-center py-4">No collectors found. Add a new collector to get started.</p>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Users className="h-16 w-16 text-gray-300 mb-4" />
+              <p className="text-lg font-medium">No collectors found</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {activeTab === "all" 
+                  ? "Add a new collector to get started" 
+                  : activeTab === "assigned" 
+                    ? "No assigned collectors found" 
+                    : "No unassigned collectors found"
+                }
+              </p>
+              {activeTab === "all" && (
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(true)}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add New Collector
+                </Button>
+              )}
+            </div>
           )}
           
           {!loading && filteredCollectors.length > 0 && (
@@ -369,53 +524,113 @@ export default function CollectorsPage() {
                 <thead>
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Name</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Username</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Email</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Phone</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Assigned Area</th>
                     <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Status</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Assigned Area</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Efficiency</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Contact</th>
                     <th className="text-right py-3 px-4 text-sm font-medium text-gray-500">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredCollectors.map((collector) => (
-                    <tr key={collector._id} className="hover:bg-gray-50">
-                      <td className="py-3 px-4">{getCollectorName(collector)}</td>
-                      <td className="py-3 px-4">{collector.username}</td>
-                      <td className="py-3 px-4">{collector.email}</td>
-                      <td className="py-3 px-4">{collector.phone || '-'}</td>
-                      <td className="py-3 px-4">{collector.area ? collector.area.name : 'Not assigned'}</td>
+                    <tr key={collector._id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">
-                        <span 
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(collector.status)}`}
-                          onClick={() => openStatusModal(collector)}
-                        >
-                          {collector.status}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{getCollectorName(collector)}</span>
+                          <span className="text-xs text-gray-500">{collector.username}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center">
+                          {collector.status === 'active' && (
+                            <span className="flex items-center">
+                              <span className="h-2 w-2 rounded-full bg-green-500 mr-2"></span>
+                              <Badge variant="outline" className={getStatusBadgeClass(collector.status)}>
+                                Active
+                              </Badge>
+                            </span>
+                          )}
+                          {collector.status === 'on-leave' && (
+                            <span className="flex items-center">
+                              <span className="h-2 w-2 rounded-full bg-amber-500 mr-2"></span>
+                              <Badge variant="outline" className={getStatusBadgeClass(collector.status)}>
+                                On Leave
+                              </Badge>
+                            </span>
+                          )}
+                          {collector.status === 'inactive' && (
+                            <span className="flex items-center">
+                              <span className="h-2 w-2 rounded-full bg-red-500 mr-2"></span>
+                              <Badge variant="outline" className={getStatusBadgeClass(collector.status)}>
+                                Inactive
+                              </Badge>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        {collector.area ? (
+                          <div className="flex items-center">
+                            <MapPin className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                            <span>{collector.area.name}</span>
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-500 bg-gray-100">Not assigned</Badge>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium">{collector.efficiency || 'N/A'}%</span>
+                            <span className="text-xs text-gray-500">{getEfficiencyLabel(collector.efficiency)}</span>
+                          </div>
+                          <Progress
+                            value={collector.efficiency} 
+                            className="h-2"
+                          >
+                            <div 
+                              className={`h-full ${getEfficiencyColor(collector.efficiency)}`} 
+                              style={{ width: `${collector.efficiency || 0}%` }}
+                            />
+                          </Progress>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm">{collector.email}</span>
+                          <span className="text-xs text-gray-500">{collector.phone || 'No phone'}</span>
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button 
-                            className="p-1 hover:bg-gray-200 rounded-full"
-                            onClick={() => openEditModal(collector)}
-                            title="Edit Collector"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button 
-                            className="p-1 hover:bg-gray-200 rounded-full"
-                            onClick={() => { setSelectedCollector(collector); setIsDeleteModalOpen(true); }}
-                            title="Delete Collector"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                          <button 
-                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                            onClick={() => openAssignModal(collector)}
-                          >
-                            Assign Area
-                          </button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => openEditDialog(collector)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openStatusDialog(collector)}>
+                              <UserCog className="mr-2 h-4 w-4" />
+                              Change Status
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openAssignDialog(collector)}>
+                              <MapPin className="mr-2 h-4 w-4" />
+                              {collector.area ? 'Reassign Area' : 'Assign Area'}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => { setSelectedCollector(collector); setIsDeleteDialogOpen(true); }}
+                              className="text-red-600 focus:text-red-600">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}
@@ -426,402 +641,482 @@ export default function CollectorsPage() {
         </CardContent>
       </Card>
 
-      {/* Add Collector Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Add New Collector</h2>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-gray-500 hover:text-gray-700">
-                <X size={20} />
-              </button>
+      {/* Collector Performance Overview */}
+      <div className="grid gap-6 grid-cols-1">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              <span>Collector Performance Overview</span>
+            </CardTitle>
+            <CardDescription>
+              Key metrics and insights about waste collection team performance
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Team Size</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{collectors.length}</div>
+            <p className="text-xs text-muted-foreground">{collectors.filter(c => c.status === 'active').length} active collectors</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg. Efficiency</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold flex items-center gap-1">
+              {
+                collectors.length > 0 
+                  ? (collectors.reduce((acc, c) => acc + (c.efficiency || 0), 0) / collectors.length).toFixed(1)
+                  : "0"
+              }%
             </div>
-            
-            <form onSubmit={handleAddCollector}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Username*</label>
-                  <input
-                    type="text"
-                    name="username"
-                    value={collectorFormData.username}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password*</label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={collectorFormData.password}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email*</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={collectorFormData.email}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                    <input
-                      type="text"
-                      name="firstName"
-                      value={collectorFormData.firstName}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                    <input
-                      type="text"
-                      name="lastName"
-                      value={collectorFormData.lastName}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={collectorFormData.phone}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    name="status"
-                    value={collectorFormData.status}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="active">Active</option>
-                    <option value="on-leave">On Leave</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Area (Optional)</label>
-                  <select
-                    name="areaId"
-                    onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="">Select an area...</option>
-                    {areas.map(area => (
-                      <option key={area.areaID} value={area.areaID}>
-                        {area.areaName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  disabled={loading}
-                >
-                  {loading ? 'Adding...' : 'Add Collector'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      
-      {/* Edit Collector Modal */}
-      {isEditModalOpen && selectedCollector && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Edit Collector</h2>
-              <button onClick={() => setIsEditModalOpen(false)} className="text-gray-500 hover:text-gray-700">
-                <X size={20} />
-              </button>
+            <div className="mt-1 h-2 w-full rounded-full bg-muted">
+              <div 
+                className="h-2 rounded-full bg-blue-500" 
+                style={{ 
+                  width: collectors.length > 0 
+                    ? `${collectors.reduce((acc, c) => acc + (c.efficiency || 0), 0) / collectors.length}%`
+                    : "0%"
+                }} 
+              />
             </div>
-            
-            <form onSubmit={handleEditCollector}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                  <input
-                    type="text"
-                    name="username"
-                    value={collectorFormData.username}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={collectorFormData.email}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                    <input
-                      type="text"
-                      name="firstName"
-                      value={collectorFormData.firstName}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                    <input
-                      type="text"
-                      name="lastName"
-                      value={collectorFormData.lastName}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={collectorFormData.phone}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    name="status"
-                    value={collectorFormData.status}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="active">Active</option>
-                    <option value="on-leave">On Leave</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  disabled={loading}
-                >
-                  {loading ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && selectedCollector && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Confirm Deletion</h2>
-              <button onClick={() => setIsDeleteModalOpen(false)} className="text-gray-500 hover:text-gray-700">
-                <X size={20} />
-              </button>
-            </div>
-            
-            <p className="mb-6">
-              Are you sure you want to delete collector <span className="font-semibold">{getCollectorName(selectedCollector)}</span>? This action cannot be undone.
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Area Coverage</CardTitle>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{collectors.filter(c => c.area).length}/{collectors.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {Math.round(collectors.filter(c => c.area).length / Math.max(collectors.length, 1) * 100)}% assigned to areas
             </p>
-            
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteCollector}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                disabled={loading}
-              >
-                {loading ? 'Deleting...' : 'Delete Collector'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Status Change Modal */}
-      {isStatusModalOpen && selectedCollector && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Change Status</h2>
-              <button onClick={() => setIsStatusModalOpen(false)} className="text-gray-500 hover:text-gray-700">
-                <X size={20} />
-              </button>
-            </div>
-            
-            <p className="mb-4">
-              Update status for <span className="font-semibold">{getCollectorName(selectedCollector)}</span>
-            </p>
-            
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <button
-                onClick={() => handleStatusChange('active')}
-                className={`p-3 border rounded-md flex flex-col items-center ${
-                  selectedCollector.status === 'active' ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass('active')} mb-2`}>
-                  Active
-                </span>
-                <span className="text-sm">Available for work</span>
-              </button>
-              
-              <button
-                onClick={() => handleStatusChange('on-leave')}
-                className={`p-3 border rounded-md flex flex-col items-center ${
-                  selectedCollector.status === 'on-leave' ? 'border-amber-500 bg-amber-50' : 'border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass('on-leave')} mb-2`}>
-                  On Leave
-                </span>
-                <span className="text-sm">Temporarily unavailable</span>
-              </button>
-              
-              <button
-                onClick={() => handleStatusChange('inactive')}
-                className={`p-3 border rounded-md flex flex-col items-center ${
-                  selectedCollector.status === 'inactive' ? 'border-red-500 bg-red-50' : 'border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass('inactive')} mb-2`}>
-                  Inactive
-                </span>
-                <span className="text-sm">Not available</span>
-              </button>
-            </div>
-            
-            <div className="flex justify-end">
-              <button
-                onClick={() => setIsStatusModalOpen(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Assign Area Modal */}
-      {isAssignModalOpen && selectedCollector && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Assign Area</h2>
-              <button onClick={() => setIsAssignModalOpen(false)} className="text-gray-500 hover:text-gray-700">
-                <X size={20} />
-              </button>
-            </div>
-            
-            <p className="mb-4">
-              Assign area for <span className="font-semibold">{getCollectorName(selectedCollector)}</span>
-            </p>
-            
-            <form onSubmit={handleAssignArea}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Area</label>
-                <select
-                  id="areaId"
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                  defaultValue={selectedCollector.area?._id}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Top Performer</CardTitle>
+            <Trophy className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            {collectors.filter(c => c.status === 'active' && c.efficiency).length > 0 ? (
+              <>
+                <div className="text-2xl font-bold">
+                  {
+                    getCollectorName(
+                      collectors
+                        .filter(c => c.status === 'active' && c.efficiency)
+                        .sort((a, b) => (b.efficiency || 0) - (a.efficiency || 0))[0]
+                    )
+                  }
+                </div>
+                <p className="text-xs flex items-center gap-1 text-muted-foreground">
+                  <span className={getEfficiencyColor(
+                    collectors
+                      .filter(c => c.status === 'active' && c.efficiency)
+                      .sort((a, b) => (b.efficiency || 0) - (a.efficiency || 0))[0]?.efficiency
+                  ).replace('bg-', 'text-')}>{
+                    collectors
+                      .filter(c => c.status === 'active' && c.efficiency)
+                      .sort((a, b) => (b.efficiency || 0) - (a.efficiency || 0))[0]?.efficiency
+                  }%</span> efficiency rating
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-gray-400">N/A</div>
+                <p className="text-xs text-muted-foreground">No active collectors</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Add Collector Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Add New Collector
+            </DialogTitle>
+            <DialogDescription>
+              Create a new collector account to manage waste collection assignments.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddCollector} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">Username*</Label>
+                <Input
+                  id="username"
+                  name="username"
+                  value={collectorFormData.username}
+                  onChange={handleInputChange}
                   required
-                >
-                  <option value="">Select an area...</option>
+                  autoComplete="username"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password*</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={collectorFormData.password}
+                  onChange={handleInputChange}
+                  required
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email*</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={collectorFormData.email}
+                onChange={handleInputChange}
+                required
+                autoComplete="email"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  value={collectorFormData.firstName}
+                  onChange={handleInputChange}
+                  autoComplete="given-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  value={collectorFormData.lastName}
+                  onChange={handleInputChange}
+                  autoComplete="family-name"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  value={collectorFormData.phone}
+                  onChange={handleInputChange}
+                  autoComplete="tel"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select name="status" value={collectorFormData.status} onValueChange={(value) => 
+                  setCollectorFormData({...collectorFormData, status: value as 'active' | 'on-leave' | 'inactive'})
+                }>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="on-leave">On Leave</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="areaId">Assign to Area (Optional)</Label>
+              <Select name="areaId" value={collectorFormData.areaId || ''} onValueChange={(value) => 
+                setCollectorFormData({...collectorFormData, areaId: value})
+              }>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an area" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Not assigned</SelectItem>
                   {areas.map(area => (
-                    <option key={area.areaID} value={area.areaID}>
+                    <SelectItem key={area.areaID} value={area.areaID}>
                       {area.areaName}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Adding...' : 'Add Collector'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Collector Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Edit Collector
+            </DialogTitle>
+            <DialogDescription>
+              Update collector details and information.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCollector && (
+            <form onSubmit={handleEditCollector} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">Username*</Label>
+                <Input
+                  id="username"
+                  name="username"
+                  value={collectorFormData.username}
+                  onChange={handleInputChange}
+                  required
+                />
               </div>
               
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAssignModalOpen(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  disabled={loading}
-                >
-                  {loading ? 'Assigning...' : 'Assign Area'}
-                </button>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email*</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={collectorFormData.email}
+                  onChange={handleInputChange}
+                  required
+                />
               </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    name="firstName"
+                    value={collectorFormData.firstName}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    name="lastName"
+                    value={collectorFormData.lastName}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    value={collectorFormData.phone}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select name="status" value={collectorFormData.status} onValueChange={(value) => 
+                    setCollectorFormData({...collectorFormData, status: value as 'active' | 'on-leave' | 'inactive'})
+                  }>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="on-leave">On Leave</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
             </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the collector{selectedCollector && 
+                <span className="font-semibold"> {getCollectorName(selectedCollector)}</span>}. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteCollector}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={loading}
+            >
+              {loading ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Status Change Dialog */}
+      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCog className="h-5 w-5" />
+              Change Collector Status
+            </DialogTitle>
+            <DialogDescription>
+              Update status for {selectedCollector && 
+                <span className="font-medium">{getCollectorName(selectedCollector)}</span>}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-4 py-4">
+            <Button
+              onClick={() => handleStatusChange('active')}
+              variant="outline"
+              className={cn(
+                selectedCollector?.status === 'active' && "border-green-500 bg-green-50 hover:bg-green-100"
+              )}
+            >
+              <div className="flex flex-col items-center gap-2">
+                <CheckCircle className="h-8 w-8 text-green-500" />
+                <span className="font-medium">Active</span>
+                <span className="text-xs text-center">Ready for assignments</span>
+              </div>
+            </Button>
+            
+            <Button
+              onClick={() => handleStatusChange('on-leave')}
+              variant="outline"
+              className={cn(
+                selectedCollector?.status === 'on-leave' && "border-amber-500 bg-amber-50 hover:bg-amber-100"
+              )}
+            >
+              <div className="flex flex-col items-center gap-2">
+                <Clock className="h-8 w-8 text-amber-500" />
+                <span className="font-medium">On Leave</span>
+                <span className="text-xs text-center">Temporarily unavailable</span>
+              </div>
+            </Button>
+            
+            <Button
+              onClick={() => handleStatusChange('inactive')}
+              variant="outline"
+              className={cn(
+                selectedCollector?.status === 'inactive' && "border-red-500 bg-red-50 hover:bg-red-100"
+              )}
+            >
+              <div className="flex flex-col items-center gap-2">
+                <AlertCircle className="h-8 w-8 text-red-500" />
+                <span className="font-medium">Inactive</span>
+                <span className="text-xs text-center">Not available for work</span>
+              </div>
+            </Button>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Assign Area Dialog */}
+      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              {selectedCollector?.area ? 'Reassign Area' : 'Assign Area'}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedCollector?.area 
+                ? `Reassign ${getCollectorName(selectedCollector!)} from ${selectedCollector.area.name} to a different area`
+                : `Assign ${selectedCollector ? getCollectorName(selectedCollector) : 'collector'} to a collection area`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAssignArea} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="areaId">Select Area</Label>
+              <Select 
+                defaultValue={selectedCollector?.area?._id || ""}
+                onValueChange={(value) => {
+                  const selectElement = document.getElementById('areaId') as HTMLInputElement;
+                  selectElement.value = value;
+                }}
+              >
+                <SelectTrigger id="areaId">
+                  <SelectValue placeholder="Select an area" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Not assigned</SelectItem>
+                  {areas.map(area => (
+                    <SelectItem key={area.areaID} value={area.areaID}>
+                      {area.areaName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAssignDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Assigning...' : 'Assign Area'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

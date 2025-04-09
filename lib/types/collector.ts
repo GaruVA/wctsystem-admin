@@ -12,6 +12,7 @@ export interface Collector {
     _id: string;
     name: string;
   };
+  efficiency?: number; // Collection efficiency percentage
   currentLocation?: {
     type: string;
     coordinates: number[]; // [longitude, latitude]
