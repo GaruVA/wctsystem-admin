@@ -11,23 +11,9 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -47,32 +33,32 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Calendar as CalendarIcon,
   Check,
   Download,
-  Filter,
   MapPin,
   Plus,
-  Search,
   Truck,
   User,
-  ArrowRight,
-  X,
-  Edit,
   Trash2,
   Clock,
   Loader2,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle,
-  RefreshCcw,
+  CalendarIcon,
 } from "lucide-react";
 import { format, addDays, subDays, isSameDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import BinMap from "@/components/dashboard/bin-map";
 import { getAllAreasWithBins, AreaWithBins } from "@/lib/api/areas"; 
-import { getAllSchedules, getScheduleById, deleteSchedule, updateScheduleStatus, Schedule } from "@/lib/api/schedules";
+import { 
+  getAllSchedules, 
+  getScheduleById, 
+  deleteSchedule, 
+  updateScheduleStatus, 
+  Schedule,
+  getWeeklyScheduleOverview 
+} from "@/lib/api/schedules";
 import { getActiveCollectors, Collector } from "@/lib/api/collectors";
 
 // Schedule Status Badge Component
@@ -99,28 +85,26 @@ const ScheduleDetailsDialog = ({
   isOpen, 
   onClose, 
   schedule,
-  onStatusChange,
-  onEdit,
   onDelete,
 }: { 
   isOpen: boolean;
   onClose: () => void;
   schedule: Schedule | null;
-  onStatusChange: (id: string, newStatus: string) => void;
-  onEdit: (schedule: Schedule) => void;
   onDelete: (id: string) => void;
 }) => {
   const [activeTab, setActiveTab] = useState("details");
   const [isLoading, setIsLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [detailedSchedule, setDetailedSchedule] = useState<Schedule | null>(schedule);
-  const [changeStatusLoading, setChangeStatusLoading] = useState(false);
 
   useEffect(() => {
     if (schedule?._id && isOpen) {
       setIsLoading(true);
       getScheduleById(schedule._id)
         .then(data => {
+          console.log("Schedule details fetched:", data);
+          console.log("Area info:", data.area);
+          console.log("Collector info:", data.collector);
           setDetailedSchedule(data);
         })
         .catch(err => console.error("Error fetching schedule details:", err))
@@ -131,14 +115,14 @@ const ScheduleDetailsDialog = ({
   }, [schedule, isOpen]);
 
   if (!isOpen || !detailedSchedule) return null;
-
+  
   // Safely access potentially undefined properties
   const scheduleName = detailedSchedule.name || 'Unnamed Schedule';
   const scheduleDate = detailedSchedule.date 
-    ? format(new Date(detailedSchedule.date), "MMMM d, yyyy")
+    ? format(new Date(detailedSchedule.date), "EEEE, MMM d")
     : 'No date specified';
   const areaName = detailedSchedule.area?.name || 'Unknown area';
-
+  
   // Format duration and distance
   const formatDuration = (minutes: number) => {
     if (!minutes) return 'Not specified';
@@ -146,24 +130,17 @@ const ScheduleDetailsDialog = ({
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
-
-  // Handle status change
-  const handleStatusChange = async (newStatus: string) => {
-    if (!detailedSchedule._id) return;
-    
-    setChangeStatusLoading(true);
-    try {
-      await onStatusChange(detailedSchedule._id, newStatus);
-      // Update the local state
-      setDetailedSchedule({
-        ...detailedSchedule,
-        status: newStatus as 'scheduled' | 'in-progress' | 'completed' | 'cancelled'
-      });
-    } catch (error) {
-      console.error("Error changing status:", error);
-    } finally {
-      setChangeStatusLoading(false);
-    }
+  
+  const getFormattedTime = () => {
+    const created = detailedSchedule.createdAt 
+      ? format(new Date(detailedSchedule.createdAt), "EEE, MMM d, h:mm a")
+      : 'Unknown';
+    return `Created ${created}`;
+  };
+  
+  const formatTime = (time: string | undefined) => {
+    if (!time) return '';
+    return format(new Date(time), "h:mm a");
   };
 
   // Handle delete confirmation
@@ -178,301 +155,238 @@ const ScheduleDetailsDialog = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="rounded-lg border bg-white text-card-foreground shadow-sm sm:max-w-[900px] p-0 overflow-hidden">
+          <div className="flex flex-col space-y-1.5 p-6 pb-2">
             <div className="flex justify-between items-start">
               <div>
-                <DialogTitle className="text-2xl">{scheduleName}</DialogTitle>
-                <DialogDescription className="mt-1">
-                  {scheduleDate} • {areaName}
-                </DialogDescription>
+                <div className="text-2xl font-semibold leading-none tracking-tight flex items-center gap-2">
+                  <CalendarDays size={18} />
+                  {scheduleName}
+                </div>
               </div>
-              <StatusBadge status={detailedSchedule.status} />
             </div>
-          </DialogHeader>
+          </div>
           
-          {isLoading ? (
-            <div className="space-y-4 py-4">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-40 w-full" />
-              <Skeleton className="h-20 w-full" />
-            </div>
-          ) : (
-            <>
-              <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="route">Route Map</TabsTrigger>
-                  <TabsTrigger value="bins">Collection Bins</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="details" className="space-y-4 py-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div className="bg-slate-50 rounded-lg p-4 space-y-3">
-                        <h3 className="font-medium text-sm text-slate-500 uppercase">Schedule Information</h3>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-slate-500">Date:</span>
-                            <span className="font-medium">{scheduleDate}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-slate-500">Start Time:</span>
-                            <span className="font-medium">
+          <div className="p-6 pt-0">
+            <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-600 grid grid-cols-3 mb-4">
+                <TabsTrigger 
+                  value="details" 
+                  className="justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm flex items-center gap-2"
+                >
+                  <Clock size={16} />
+                  Details
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="route" 
+                  className="justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm flex items-center gap-2"
+                >
+                  <MapPin size={16} />
+                  Route Map
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="bins" 
+                  className="justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm flex items-center gap-2"
+                >
+                  <Truck size={16} />
+                  Collection Bins
+                </TabsTrigger>
+              </TabsList>
+            
+              {isLoading ? (
+                <div className="p-6 space-y-4">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-40 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : (
+                <>
+                  {/* Details Tab */}
+                  <TabsContent value="details" className="mt-0">
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            Schedule Information
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-4">
+                          <div className="grid grid-cols-2 gap-y-4">
+                            <div className="font-medium">Date</div>
+                            <div>{scheduleDate}</div>
+                            
+                            <div className="font-medium">Start Time</div>
+                            <div>
                               {detailedSchedule.startTime 
                                 ? format(new Date(detailedSchedule.startTime), "h:mm a") 
                                 : 'Not set'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-slate-500">End Time:</span>
-                            <span className="font-medium">
+                            </div>
+                            
+                            <div className="font-medium">End Time</div>
+                            <div>
                               {detailedSchedule.endTime 
                                 ? format(new Date(detailedSchedule.endTime), "h:mm a") 
                                 : 'Not set'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-slate-500">Duration:</span>
-                            <span className="font-medium">
-                              {formatDuration(detailedSchedule.duration || 0)}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-slate-500">Distance:</span>
-                            <span className="font-medium">
+                            </div>
+                            
+                            <div className="font-medium">Duration</div>
+                            <div>{formatDuration(detailedSchedule.duration || 0)}</div>
+                            
+                            <div className="font-medium">Distance</div>
+                            <div>
                               {typeof detailedSchedule.distance === 'number' 
                                 ? `${detailedSchedule.distance.toFixed(1)} km` 
                                 : 'Not specified'}
-                            </span>
+                            </div>
+                            
+                            <div className="font-medium">Status</div>
+                            <div>
+                              <StatusBadge status={detailedSchedule.status} />
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-slate-500">Bins to Collect:</span>
-                            <span className="font-medium">
-                              {(detailedSchedule.binSequence?.length || 0)}
-                            </span>
-                          </div>
-                        </div>
+                          
+                          {detailedSchedule.notes && (
+                            <div className="pt-4 border-t mt-4">
+                              <h4 className="font-medium mb-2">Notes</h4>
+                              <div className="bg-muted/50 p-3 rounded-md whitespace-pre-wrap text-sm">
+                                {detailedSchedule.notes}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                      
+                      <div className="space-y-6">
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              Assigned Collector
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {detailedSchedule.collector ? (
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <User className="h-5 w-5 text-primary" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">
+                                    {`${detailedSchedule.collector.firstName || ''} ${detailedSchedule.collector.lastName || ''}`}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {detailedSchedule.collector.phone || 'No contact information'}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-3 text-muted-foreground">
+                                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                                  <User className="h-5 w-5" />
+                                </div>
+                                <p>No collector assigned</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                        
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-muted-foreground" />
+                              Collection Area
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                                <MapPin className="h-5 w-5 text-green-700" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{areaName}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {detailedSchedule.binSequence?.length || 0} bins to collect
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
                       </div>
-                    
-                      {detailedSchedule.notes && (
-                        <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-                          <h3 className="font-medium text-sm text-slate-500 uppercase">Notes</h3>
-                          <div className="text-sm whitespace-pre-wrap">
-                            {detailedSchedule.notes}
+                    </div>
+                  </TabsContent>
+
+                  {/* Route Tab */}
+                  <TabsContent value="route" className="mt-0">
+                    <div className="h-[500px] rounded-md overflow-hidden">
+                      {detailedSchedule.route && detailedSchedule.route.length > 0 ? (
+                        <BinMap 
+                          optimizedRoute={detailedSchedule.route}
+                          bins={[]}
+                          style={{ height: "500px", width: "100%" }}
+                          fitToRoute={true}
+                        />
+                      ) : (
+                        <div className="h-full flex items-center justify-center bg-muted/50">
+                          <div className="text-center">
+                            <MapPin className="h-12 w-12 text-muted mx-auto mb-2" />
+                            <p className="text-muted-foreground">No route data available</p>
                           </div>
                         </div>
                       )}
                     </div>
-                    
-                    <div className="space-y-4">
-                      <div className="bg-slate-50 rounded-lg p-4 space-y-3">
-                        <h3 className="font-medium text-sm text-slate-500 uppercase">Assignment</h3>
-                        <div className="flex items-center p-3 border bg-white rounded-md">
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                            <User className="h-5 w-5 text-blue-700" />
-                          </div>
-                          <div>
-                            <p className="font-medium">
-                              {detailedSchedule.collector?.firstName 
-                                ? `${detailedSchedule.collector.firstName} ${detailedSchedule.collector.lastName || ''}` 
-                                : 'Unassigned'}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {detailedSchedule.collector?.phone || 'No contact information'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-slate-50 rounded-lg p-4 space-y-3">
-                        <h3 className="font-medium text-sm text-slate-500 uppercase">Area</h3>
-                        <div className="flex items-center p-3 border bg-white rounded-md">
-                          <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center mr-3">
-                            <MapPin className="h-5 w-5 text-green-700" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{areaName}</p>
-                            <p className="text-xs text-slate-500">
-                              Collection Area
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-slate-50 rounded-lg p-4 space-y-3">
-                        <h3 className="font-medium text-sm text-slate-500 uppercase">Status</h3>
-                        <div className="flex flex-wrap gap-2">
-                          <Button 
-                            variant={detailedSchedule.status === "scheduled" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => handleStatusChange("scheduled")}
-                            disabled={changeStatusLoading}
-                            className={detailedSchedule.status === "scheduled" ? "bg-blue-600" : ""}
-                          >
-                            <Check className={cn("mr-1 h-4 w-4", 
-                              detailedSchedule.status === "scheduled" ? "opacity-100" : "opacity-0")} />
-                            Scheduled
-                          </Button>
-                          <Button 
-                            variant={detailedSchedule.status === "in-progress" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => handleStatusChange("in-progress")}
-                            disabled={changeStatusLoading}
-                            className={detailedSchedule.status === "in-progress" ? "bg-amber-600" : ""}
-                          >
-                            <Check className={cn("mr-1 h-4 w-4", 
-                              detailedSchedule.status === "in-progress" ? "opacity-100" : "opacity-0")} />
-                            In Progress
-                          </Button>
-                          <Button 
-                            variant={detailedSchedule.status === "completed" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => handleStatusChange("completed")}
-                            disabled={changeStatusLoading}
-                            className={detailedSchedule.status === "completed" ? "bg-green-600" : ""}
-                          >
-                            <Check className={cn("mr-1 h-4 w-4", 
-                              detailedSchedule.status === "completed" ? "opacity-100" : "opacity-0")} />
-                            Completed
-                          </Button>
-                          <Button 
-                            variant={detailedSchedule.status === "cancelled" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => handleStatusChange("cancelled")}
-                            disabled={changeStatusLoading}
-                            className={detailedSchedule.status === "cancelled" ? "bg-red-600" : ""}
-                          >
-                            <Check className={cn("mr-1 h-4 w-4", 
-                              detailedSchedule.status === "cancelled" ? "opacity-100" : "opacity-0")} />
-                            Cancelled
-                          </Button>
-                          {changeStatusLoading && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="route" className="py-4">
-                  <div className="h-[450px] border rounded-md overflow-hidden">
-                    {detailedSchedule.route && detailedSchedule.route.length > 0 ? (
-                      <BinMap 
-                        optimizedRoute={detailedSchedule.route}
-                        bins={[]} // We would need to fetch bin details
-                        style={{ height: "450px" }}
-                        fitToRoute={true}
-                      />
-                    ) : (
-                      <div className="h-full flex items-center justify-center">
-                        <div className="text-center">
-                          <MapPin className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-                          <p className="text-slate-500">No route data available</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="bins" className="py-4">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-medium">Collection Sequence</h3>
-                      <span className="text-sm text-slate-500">
-                        {detailedSchedule.binSequence?.length || 0} bins total
-                      </span>
-                    </div>
-                    
-                    {(detailedSchedule.binSequence || []).length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-2">
-                        {(detailedSchedule.binSequence || []).map((binId: string, index: number) => (
-                          <div key={binId} className="flex items-center p-3 border rounded-md">
-                            <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-800 rounded-full mr-3">
-                              {index + 1}
-                            </div>
-                            <div className="flex-grow">
-                              <p className="font-medium truncate">Bin: {binId}</p>
-                              <div className="flex items-center mt-1">
-                                <Clock className="h-3 w-3 text-slate-400 mr-1" />
-                                <span className="text-xs text-slate-500">
-                                  Estimated arrival: {
-                                    detailedSchedule.startTime ? 
-                                    format(
-                                      new Date(new Date(detailedSchedule.startTime).getTime() + (index * 10 * 60000)),
-                                      "h:mm a"
-                                    ) : 'Not available'
-                                  }
-                                </span>
+                  </TabsContent>
+                  
+                  {/* Bins Tab */}
+                  <TabsContent value="bins" className="mt-0">
+                    <Card>
+                      <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                        <CardTitle className="text-base">Collection Sequence</CardTitle>
+                        <Badge variant="outline">{detailedSchedule.binSequence?.length || 0} bins total</Badge>
+                      </CardHeader>
+                      <CardContent>
+                        {(detailedSchedule.binSequence || []).length > 0 ? (
+                          <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 max-h-[400px] overflow-y-auto pr-2">
+                            {(detailedSchedule.binSequence || []).map((binId: string, index: number) => (
+                              <div key={binId} className="flex items-center p-4 border bg-muted/30 rounded-lg">
+                                <div className="flex items-center justify-center w-9 h-9 bg-primary/10 text-primary rounded-full mr-3 font-semibold">
+                                  {index + 1}
+                                </div>
+                                <div className="flex-grow">
+                                  <p className="font-medium text-sm">{binId}</p>
+                                  <div className="flex items-center mt-1">
+                                    <Clock className="h-3.5 w-3.5 text-muted-foreground mr-1" />
+                                    <span className="text-xs text-muted-foreground">
+                                      Estimated arrival: {
+                                        detailedSchedule.startTime ? 
+                                        format(
+                                          new Date(new Date(detailedSchedule.startTime).getTime() + (index * 10 * 60000)),
+                                          "h:mm a"
+                                        ) : 'Not available'
+                                      }
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="h-36 flex items-center justify-center bg-muted/50 rounded-lg">
+                            <div className="text-center">
+                              <Truck className="h-12 w-12 text-muted mx-auto mb-2" />
+                              <p className="text-muted-foreground">No bin sequence data available</p>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="h-36 flex items-center justify-center border rounded-md">
-                        <div className="text-center">
-                          <Truck className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-                          <p className="text-slate-500">No bin sequence data available</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
-              
-              <DialogFooter className="flex items-center justify-between border-t pt-4">
-                <div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setConfirmDelete(true)}
-                    className="text-red-600 border-red-200 hover:bg-red-50"
-                  >
-                    <Trash2 className="mr-1 h-4 w-4" />
-                    Delete
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => onEdit(detailedSchedule)}
-                  >
-                    <Edit className="mr-1 h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    onClick={onClose}
-                  >
-                    Close
-                  </Button>
-                </div>
-              </DialogFooter>
-            </>
-          )}
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </>
+              )}
+            </Tabs>
+          </div>
         </DialogContent>
       </Dialog>
-      
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Schedule</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this schedule? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };
@@ -480,30 +394,35 @@ const ScheduleDetailsDialog = ({
 // Day Schedule Card Component
 const DayScheduleCard = ({ 
   day, 
-  schedules,
+  weeklyData,
   onViewDetails,
   isSelected,
   onSelectDay 
 }: { 
   day: Date, 
-  schedules: Schedule[], 
+  weeklyData: any[], 
   onViewDetails: (schedule: Schedule) => void,
   isSelected: boolean,
   onSelectDay: (day: Date) => void
 }) => {
-  const daySchedules = schedules.filter(schedule => {
-    const scheduleDate = new Date(schedule.date);
-    return isSameDay(scheduleDate, day);
-  });
+  // Format current day as YYYY-MM-DD to match with the API data
+  const dayFormatted = format(day, "yyyy-MM-dd");
   
+  // Find data for this specific day from the weekly overview
+  const dayData = weeklyData.find(item => item.date === dayFormatted);
+  
+  // Get schedule counts by status
+  const statusCounts = dayData?.statusCounts || [];
+  const scheduled = statusCounts.find((s: { status: string; count: number }) => s.status === 'scheduled')?.count || 0;
+  const inProgress = statusCounts.find((s: { status: string; count: number }) => s.status === 'in-progress')?.count || 0;
+  const completed = statusCounts.find((s: { status: string; count: number }) => s.status === 'completed')?.count || 0;
+  const cancelled: number = statusCounts.find((s: { status: string; count: number }) => s.status === 'cancelled')?.count || 0;
+  const totalCount = dayData?.totalCount || 0;
+  
+  // Format day number and name
   const formattedDay = format(day, "d");
-  const dayName = format(day, "EEE");
+  const dayName = format(day, "EEE"); // Use standard 3-letter weekday format (Sun, Mon, Tue...)
   const isToday = isSameDay(day, new Date());
-  
-  // Group schedules by status
-  const scheduled = daySchedules.filter(s => s.status === 'scheduled').length;
-  const inProgress = daySchedules.filter(s => s.status === 'in-progress').length;
-  const completed = daySchedules.filter(s => s.status === 'completed').length;
   
   return (
     <div 
@@ -516,7 +435,7 @@ const DayScheduleCard = ({
     >
       <div className="text-center mb-2">
         <p className={cn(
-          "text-xs font-medium",
+          "text-sm font-medium",
           isToday ? "text-blue-600" : "text-slate-500"
         )}>
           {dayName}
@@ -529,7 +448,7 @@ const DayScheduleCard = ({
         </p>
       </div>
       
-      {daySchedules.length > 0 ? (
+      {totalCount > 0 ? (
         <div className="space-y-1.5">
           {scheduled > 0 && (
             <div className="flex justify-between items-center text-xs">
@@ -557,20 +476,16 @@ const DayScheduleCard = ({
               </Badge>
             </div>
           )}
+
+          {cancelled > 0 && (
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-500">Cancelled:</span>
+              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                {cancelled}
+              </Badge>
+            </div>
+          )}
           
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="w-full h-7 mt-1"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (daySchedules.length === 1) {
-                onViewDetails(daySchedules[0]);
-              }
-            }}
-          >
-            {daySchedules.length === 1 ? "View" : `${daySchedules.length} schedules`}
-          </Button>
         </div>
       ) : (
         <div className="flex items-center justify-center h-[76px]">
@@ -583,21 +498,23 @@ const DayScheduleCard = ({
 
 export default function SchedulePage() {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  // Initialize selectedDate to today by default
+  const today = new Date();
+  const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [areas, setAreas] = useState<AreaWithBins[]>([]);
   const [collectors, setCollectors] = useState<Collector[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [weekStartDate, setWeekStartDate] = useState<Date>(new Date());
-  
-  // Additional state for filtering
-  const [filterStatus, setFilterStatus] = useState<string>("");
-  const [filterArea, setFilterArea] = useState<string>("");
-  const [filterCollector, setFilterCollector] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  // Initialize weekStartDate to the Sunday of the current week
+  const [weekStartDate, setWeekStartDate] = useState<Date>(() => {
+    const dayOfWeek = today.getDay(); // 0 is Sunday, 1 is Monday, etc.
+    // Subtract the day of week to get to the previous Sunday
+    return subDays(today, dayOfWeek);
+  });
   
   // Add state for delete confirm dialog
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<boolean>(false);
@@ -639,90 +556,96 @@ export default function SchedulePage() {
     fetchCollectors();
   }, []);
   
-  // Fetch areas and schedules when date changes
+  // Update weekly data fetching to use the new weekly overview endpoint
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchWeeklyOverview = async () => {
       try {
         setIsLoading(true);
+        
+        // Calculate week start and end dates
+        const weekStartFormatted = format(weekStartDate, "yyyy-MM-dd");
+        const weekEndFormatted = format(addDays(weekStartDate, 6), "yyyy-MM-dd");
         
         // Fetch areas (still needed for displaying area names)
         const areasData = await getAllAreasWithBins();
         setAreas(areasData);
         
-        // Format date for API query (YYYY-MM-DD)
-        const dateString = format(selectedDate, "yyyy-MM-dd");
-        
-        // Fetch schedules with date parameter
-        const schedulesData = await getAllSchedules({ date: dateString });
-        
-        // Process schedules to ensure area and collector info is available
-        const processedSchedules = schedulesData.map((schedule: Schedule) => {
-          // If we don't have an area object but have an areaId
-          if (!schedule.area && schedule.areaId) {
-            const matchingArea = areasData.find((area: any) => area.areaID === schedule.areaId);
-            if (matchingArea) {
-              schedule.area = {
-                _id: matchingArea.areaID,
-                name: matchingArea.areaName
-              };
-            }
-          }
-          return schedule;
+        // Fetch weekly overview data
+        const weeklyOverviewResponse = await getWeeklyScheduleOverview({
+          fromDate: weekStartFormatted,
+          toDate: weekEndFormatted
         });
         
-        setSchedules(processedSchedules);
-        setFilteredSchedules(processedSchedules);
+        // Process the weekly overview data
+        const weeklyData = weeklyOverviewResponse.data || [];
+        setWeeklyData(weeklyData);
+        
+        // Fetch daily schedules for the selected date
+        fetchDailySchedules(selectedDate);
       } catch (err) {
-        console.error('Error fetching data:', err);
+        console.error('Error fetching weekly overview:', err);
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchData();
-  }, [selectedDate]);
-  
-  // Filter schedules when filter criteria change
-  useEffect(() => {
-    let filtered = [...schedules];
-    
-    // Filter by status
-    if (filterStatus) {
-      filtered = filtered.filter(s => s.status === filterStatus);
+    fetchWeeklyOverview();
+  }, [weekStartDate]); // Only refetch when the week changes
+
+  // Separate function to fetch daily schedules
+  const fetchDailySchedules = async (date: Date) => {
+    try {
+      setIsLoading(true);
+      
+      // Format date for API query
+      const dateString = format(date, "yyyy-MM-dd");
+      
+      // Fetch schedules specifically for the selected date
+      const schedulesData = await getAllSchedules({ date: dateString });
+      
+      // Process schedules to ensure area and collector info is available
+      const processedSchedules = schedulesData.map((schedule: Schedule) => {
+        if (!schedule.area && schedule.areaId) {
+          const matchingArea = areas.find((area: any) => area.areaID === schedule.areaId);
+          if (matchingArea) {
+            schedule.area = {
+              _id: matchingArea.areaID,
+              name: matchingArea.areaName
+            };
+          }
+        }
+        return schedule;
+      });
+      
+      // Update filtered schedules state with the daily data
+      setFilteredSchedules(processedSchedules);
+    } catch (err) {
+      console.error('Error fetching daily schedules:', err);
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Filter by area
-    if (filterArea) {
-      filtered = filtered.filter(s => s.areaId === filterArea || s.area?._id === filterArea);
-    }
-    
-    // Filter by collector
-    if (filterCollector) {
-      filtered = filtered.filter(s => s.collectorId === filterCollector || s.collector?._id === filterCollector);
-    }
-    
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(s => 
-        s.name?.toLowerCase().includes(query) ||
-        s.area?.name?.toLowerCase().includes(query) ||
-        s.collector?.firstName?.toLowerCase().includes(query) ||
-        s.collector?.lastName?.toLowerCase().includes(query)
-      );
-    }
-    
-    setFilteredSchedules(filtered);
-  }, [schedules, filterStatus, filterArea, filterCollector, searchQuery]);
+  };
   
   // Handle date change
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
+    
+    // Filter schedules for the newly selected date
+    const selectedDateFormatted = format(date, "yyyy-MM-dd");
+    const filteredForSelectedDate = schedules.filter((schedule: Schedule) => {
+      const scheduleDate = schedule.date ? format(new Date(schedule.date), "yyyy-MM-dd") : null;
+      return scheduleDate === selectedDateFormatted;
+    });
+    
+    setFilteredSchedules(filteredForSelectedDate);
   };
   
   // Handle day card click
   const handleDaySelect = (day: Date) => {
     setSelectedDate(day);
+    
+    // Fetch the schedules for the selected day
+    fetchDailySchedules(day);
   };
 
   // Handle view details
@@ -753,12 +676,6 @@ export default function SchedulePage() {
     }
   };
   
-  // Handle edit schedule
-  const handleEditSchedule = (schedule: Schedule) => {
-    // Navigate to the routes page with the schedule ID as a parameter
-    router.push(`/dashboard/routes?edit=${schedule._id}`);
-  };
-  
   // Handle delete schedule
   const handleDeleteSchedule = async (id: string) => {
     try {
@@ -780,17 +697,6 @@ export default function SchedulePage() {
     alert("Export functionality would be implemented here");
   };
   
-  // Reset filters
-  const resetFilters = () => {
-    setFilterStatus("");
-    setFilterArea("");
-    setFilterCollector("");
-    setSearchQuery("");
-  };
-  
-  // Check if any filters are active
-  const hasActiveFilters = filterStatus || filterArea || filterCollector || searchQuery;
-  
   // Format schedule time
   const formatScheduleTime = (schedule: Schedule) => {
     if (!schedule.startTime) return "Time not set";
@@ -807,18 +713,13 @@ export default function SchedulePage() {
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Schedules</h1>
-          <p className="text-muted-foreground">
-            View and manage waste collection schedules
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Schedules</h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button onClick={() => router.push("/dashboard/routes")}>
+          <Button size="sm" onClick={() => router.push("/dashboard/routes")}>
             <Plus className="mr-2 h-4 w-4" />
             Create Schedule
           </Button>
@@ -834,45 +735,29 @@ export default function SchedulePage() {
                 <CalendarDays className="h-5 w-5 text-slate-400" />
                 Weekly Overview
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="mt-1.5">
                 {format(weekStartDate, "MMMM d")} - {format(addDays(weekStartDate, 6), "MMMM d, yyyy")}
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={goToPreviousWeek}>
-                <ChevronLeft className="h-4 w-4" />
-                <span className="sr-only">Previous Week</span>
+              <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                Previous Week
               </Button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    Select Date
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => date && setSelectedDate(date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <Button variant="outline" size="icon" onClick={goToNextWeek}>
-                <ChevronRight className="h-4 w-4" />
-                <span className="sr-only">Next Week</span>
+              <Button variant="outline" size="sm" onClick={goToNextWeek}>
+                Next Week
+                <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-3">
+          <div className="grid grid-cols-7 gap-3">
             {weekDays.map((day) => (
               <DayScheduleCard
                 key={format(day, "yyyy-MM-dd")}
                 day={day}
-                schedules={schedules}
+                weeklyData={weeklyData}
                 onViewDetails={handleViewDetails}
                 isSelected={isSameDay(day, selectedDate)}
                 onSelectDay={handleDaySelect}
@@ -880,75 +765,6 @@ export default function SchedulePage() {
             ))}
           </div>
         </CardContent>
-      </Card>
-      
-      {/* Filter and Search */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                <Input 
-                  type="search" 
-                  placeholder="Search schedules..." 
-                  className="pl-8"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={filterArea} onValueChange={setFilterArea}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Area" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Areas</SelectItem>
-                  {areas.map(area => (
-                    <SelectItem key={area.areaID} value={area.areaID}>
-                      {area.areaName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Select value={filterCollector} onValueChange={setFilterCollector}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Collector" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Collectors</SelectItem>
-                  {collectors.map(collector => (
-                    <SelectItem key={collector._id} value={collector._id}>
-                      {`${collector.firstName || ''} ${collector.lastName || ''}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9">
-                  <X className="mr-1 h-4 w-4" />
-                  Clear
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardHeader>
       </Card>
       
       {/* Schedules List */}
@@ -1011,14 +827,6 @@ export default function SchedulePage() {
                   </div>
                   <div className="flex gap-2 self-end sm:self-center">
                     <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditSchedule(schedule)}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
                       size="sm"
                       onClick={() => handleViewDetails(schedule)}
                     >
@@ -1034,40 +842,12 @@ export default function SchedulePage() {
                 <CalendarIcon className="h-6 w-6 text-slate-500" />
               </div>
               <h3 className="text-lg font-medium">No schedules found</h3>
-              {hasActiveFilters ? (
-                <>
-                  <p className="text-sm text-slate-500 mt-1 mb-4">
-                    No schedules match your current filters
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={resetFilters} 
-                    className="mx-auto"
-                  >
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    Reset Filters
-                  </Button>
-                </>
-              ) : (
-                <p className="text-sm text-slate-500 mt-1">
-                  No collection schedules for {formattedDate}
-                </p>
-              )}
+              <p className="text-sm text-slate-500 mt-1">
+                No collection schedules for {formattedDate}
+              </p>
             </div>
           )}
         </CardContent>
-        <CardFooter className="flex justify-between py-4">
-          <p className="text-sm text-slate-500">
-            {filteredSchedules.length} {filteredSchedules.length === 1 ? 'schedule' : 'schedules'} found
-          </p>
-          {filteredSchedules.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/routes")}>
-              <Plus className="mr-1 h-4 w-4" />
-              Add Schedule
-            </Button>
-          )}
-        </CardFooter>
       </Card>
       
       {/* Schedule details dialog */}
@@ -1075,8 +855,6 @@ export default function SchedulePage() {
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
         schedule={selectedSchedule}
-        onStatusChange={handleStatusChange}
-        onEdit={handleEditSchedule}
         onDelete={handleDeleteSchedule}
       />
     </div>

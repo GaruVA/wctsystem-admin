@@ -57,19 +57,23 @@ export interface ScheduleData {
  * Get all schedules (with area and collector populated)
  */
 export async function getAllSchedules(
-  query: { date?: string; areaId?: string; collectorId?: string; status?: string } = {}
+  query: { date?: string; fromDate?: string; toDate?: string; areaId?: string; collectorId?: string; status?: string } = {}
 ): Promise<Schedule[]> {
   try {
     const queryParams = new URLSearchParams();
     
-    // Add query parameters if present
+    // Add query parameters if present - handle both date and date range params
     if (query.date) {
       // Format the date as YYYY-MM-DD for the API
       queryParams.append('date', query.date);
       
-      // We also need to add fromDate and toDate for the backend's date range filter
-      queryParams.append('fromDate', query.date);
-      queryParams.append('toDate', query.date);
+      // If no explicit fromDate/toDate provided, use date for both
+      if (!query.fromDate) queryParams.append('fromDate', query.date);
+      if (!query.toDate) queryParams.append('toDate', query.date);
+    } else {
+      // If no specific date but we have fromDate/toDate range
+      if (query.fromDate) queryParams.append('fromDate', query.fromDate);
+      if (query.toDate) queryParams.append('toDate', query.toDate);
     }
     
     if (query.areaId) queryParams.append('areaId', query.areaId);
@@ -152,7 +156,29 @@ export async function getScheduleById(scheduleId: string): Promise<Schedule> {
       throw new Error(errorData.message || 'Failed to fetch schedule');
     }
     
-    return await response.json();
+    const schedule = await response.json();
+    
+    // Process the data structure to ensure area and collector information is properly normalized
+    // Handle area information
+    if (schedule.areaId && typeof schedule.areaId === 'object' && schedule.areaId._id) {
+      schedule.area = {
+        _id: schedule.areaId._id,
+        name: schedule.areaId.name || 'Unknown Area'
+      };
+    }
+    
+    // Handle collector information
+    if (schedule.collectorId && typeof schedule.collectorId === 'object' && schedule.collectorId._id) {
+      schedule.collector = {
+        _id: schedule.collectorId._id,
+        firstName: schedule.collectorId.firstName || 'Unknown',
+        lastName: schedule.collectorId.lastName || 'Collector',
+        username: schedule.collectorId.username || '',
+        phone: schedule.collectorId.phone || ''
+      };
+    }
+    
+    return schedule;
   } catch (error) {
     console.error('Error fetching schedule:', error);
     throw error;
@@ -323,6 +349,45 @@ export async function saveRouteSchedule(scheduleData: any): Promise<Schedule> {
     return await createSchedule(scheduleData as unknown as ScheduleData);
   } catch (error) {
     console.error('Error saving route as schedule:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get weekly schedule overview (counts by day and status)
+ */
+export async function getWeeklyScheduleOverview(
+  query: { fromDate: string; toDate: string }
+): Promise<any> {
+  try {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+    
+    const queryParams = new URLSearchParams();
+    
+    // Add query parameters
+    if (query.fromDate) queryParams.append('fromDate', query.fromDate);
+    if (query.toDate) queryParams.append('toDate', query.toDate);
+    
+    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+    const url = `${API_BASE_URL}/schedules/weekly-overview${queryString}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    const responseData = await response.json();
+    return responseData;
+  } catch (error) {
+    console.error('Error fetching weekly schedule overview:', error);
     throw error;
   }
 }
