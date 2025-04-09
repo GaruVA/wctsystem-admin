@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { getAllAreasWithBins, AreaWithBins, Bin } from "@/lib/api/areas";
 import { cn } from "@/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const api = axios.create({
   baseURL: "http://localhost:5000/api",
@@ -48,6 +49,14 @@ interface Alert {
   type: string;
 }
 
+interface Issue {
+  _id: string;
+  bin: { name: string };
+  issueType: string;
+  description?: string;
+  createdAt: string;
+}
+
 export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +67,8 @@ export default function DashboardPage() {
   const [areasError, setAreasError] = useState<string | null>(null);
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [issuesLoading, setIssuesLoading] = useState(true);
 
   const [overallStats, setOverallStats] = useState({
     avgUtilization: 0,
@@ -237,6 +248,21 @@ export default function DashboardPage() {
       default: return 'text-gray-500 bg-gray-100';
     }
   };
+
+  useEffect(() => {
+    const fetchIssues = async () => {
+      try {
+        const response = await axios.get<Issue[]>("http://localhost:5000/api/issue"); // Replace with your backend URL
+        setIssues(response.data);
+      } catch (error) {
+        console.error("Error fetching issues:", error);
+      } finally {
+        setIssuesLoading(false);
+      }
+    };
+
+    fetchIssues();
+  }, []);
 
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -433,6 +459,58 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Issues Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle size={20} className="text-red-500" />
+              Reported Issues
+            </CardTitle>
+            <CardDescription>
+              A detailed list of reported issues in the system.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {issuesLoading ? (
+              <div className="flex justify-center items-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                <span className="ml-2 text-sm text-muted-foreground">Loading issues...</span>
+              </div>
+            ) : issues.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">No issues reported.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {issues.map((issue) => (
+                  <div
+                    key={issue._id}
+                    className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
+                      <AlertTriangle size={20} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-medium text-gray-800">
+                        {issue.issueType}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {issue.description || "No description provided"}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        <strong>Bin:</strong> {issue.bin?.name || "Unknown"} |{" "}
+                        <strong>Reported At:</strong>{" "}
+                        {new Date(issue.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Area Status Overview */}
         <AreaStatusOverview />
       </div>
