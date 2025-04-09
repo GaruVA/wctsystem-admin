@@ -36,6 +36,24 @@ export interface Schedule {
 }
 
 /**
+ * Interface for schedule creation/update
+ */
+export interface ScheduleData {
+  name: string;
+  areaId: string;
+  collectorId?: string;
+  date: string;
+  startTime: string;
+  endTime?: string;
+  status?: 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
+  notes?: string;
+  route: Array<[number, number]>;
+  distance: number;
+  duration: number;
+  binSequence: string[];
+}
+
+/**
  * Get all schedules (with area and collector populated)
  */
 export async function getAllSchedules(
@@ -61,11 +79,14 @@ export async function getAllSchedules(
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
     const url = `${API_BASE_URL}/schedules${queryString}`;
     
-    console.log('Fetching schedules from:', url);
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
     
     const response = await fetch(url, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        'Authorization': `Bearer ${token}`
       }
     });
     
@@ -74,7 +95,6 @@ export async function getAllSchedules(
     }
     
     const responseData = await response.json();
-    console.log('API Response:', responseData);
     
     // Handle the backend response structure - backend returns an object with data property
     const schedulesData = responseData.data || responseData;
@@ -107,7 +127,7 @@ export async function getAllSchedules(
     });
   } catch (error) {
     console.error('Error fetching schedules:', error);
-    return [];
+    throw error;
   }
 }
 
@@ -116,9 +136,14 @@ export async function getAllSchedules(
  */
 export async function getScheduleById(scheduleId: string): Promise<Schedule> {
   try {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+    
     const response = await fetch(`${API_BASE_URL}/schedules/${scheduleId}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        'Authorization': `Bearer ${token}`
       }
     });
     
@@ -137,13 +162,18 @@ export async function getScheduleById(scheduleId: string): Promise<Schedule> {
 /**
  * Create a new schedule
  */
-export async function createSchedule(scheduleData: Omit<Schedule, '_id' | 'createdAt' | 'updatedAt'>): Promise<Schedule> {
+export async function createSchedule(scheduleData: ScheduleData): Promise<Schedule> {
   try {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+    
     const response = await fetch(`${API_BASE_URL}/schedules`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(scheduleData)
     });
@@ -161,6 +191,37 @@ export async function createSchedule(scheduleData: Omit<Schedule, '_id' | 'creat
 }
 
 /**
+ * Update an existing schedule
+ */
+export async function updateSchedule(scheduleId: string, scheduleData: Partial<ScheduleData>): Promise<Schedule> {
+  try {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/schedules/${scheduleId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(scheduleData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to update schedule');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating schedule:', error);
+    throw error;
+  }
+}
+
+/**
  * Update schedule status
  */
 export async function updateScheduleStatus(
@@ -168,11 +229,16 @@ export async function updateScheduleStatus(
   status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled'
 ): Promise<Schedule> {
   try {
-    const response = await fetch(`${API_BASE_URL}/schedules/${scheduleId}/status`, {
-      method: 'PATCH',
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/schedules/${scheduleId}`, {
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ status })
     });
@@ -190,14 +256,50 @@ export async function updateScheduleStatus(
 }
 
 /**
+ * Assign collector to schedule
+ */
+export async function assignCollector(scheduleId: string, collectorId: string): Promise<Schedule> {
+  try {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/schedules/${scheduleId}/assign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ collectorId })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to assign collector to schedule');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error assigning collector to schedule:', error);
+    throw error;
+  }
+}
+
+/**
  * Delete a schedule
  */
 export async function deleteSchedule(scheduleId: string): Promise<{ message: string }> {
   try {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+    
     const response = await fetch(`${API_BASE_URL}/schedules/${scheduleId}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        'Authorization': `Bearer ${token}`
       }
     });
     
@@ -209,6 +311,18 @@ export async function deleteSchedule(scheduleId: string): Promise<{ message: str
     return await response.json();
   } catch (error) {
     console.error('Error deleting schedule:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save route as schedule (helper function for route page)
+ */
+export async function saveRouteSchedule(scheduleData: any): Promise<Schedule> {
+  try {
+    return await createSchedule(scheduleData as unknown as ScheduleData);
+  } catch (error) {
+    console.error('Error saving route as schedule:', error);
     throw error;
   }
 }

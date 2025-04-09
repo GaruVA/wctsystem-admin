@@ -2,6 +2,9 @@
 
 import { Collector, CollectorFormData, CollectorUpdateData, StatusUpdate } from '../types/collector';
 
+// Re-export the Collector type for use in other components
+export type { Collector };
+
 const API_BASE_URL = 'http://localhost:5000/api';
 
 // Get all collectors (admin only)
