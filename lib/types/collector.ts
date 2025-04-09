@@ -41,6 +41,7 @@ export interface CollectorUpdateData {
   phone?: string;
   area?: string;
   status?: 'active' | 'on-leave' | 'inactive';
+  efficiency?: number;
 }
 
 export interface AreaAssignment {

@@ -184,3 +184,58 @@ export async function assignCollectorToArea(collectorId: string, areaId: string)
     throw error;
   }
 }
+
+// Update collector efficiency (admin only)
+export async function updateCollectorEfficiency(collectorId: string, efficiency: number): Promise<{ message: string, collector: Collector }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/collector/${collectorId}/efficiency`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+      },
+      body: JSON.stringify({ efficiency })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to update collector efficiency');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating collector efficiency:', error);
+    throw error;
+  }
+}
+
+// Get collector efficiency statistics (admin only)
+export async function getCollectorEfficiencyStats(): Promise<{
+  avgEfficiency: number;
+  distribution: {
+    excellent: number;
+    good: number;
+    average: number;
+    poor: number;
+  };
+  topPerformers: Collector[];
+  totalCollectors: number;
+  activeCollectors: number;
+}> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/collector/efficiency/stats`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch collector efficiency statistics');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching collector efficiency stats:', error);
+    throw error;
+  }
+}
