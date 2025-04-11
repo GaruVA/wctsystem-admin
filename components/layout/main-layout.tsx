@@ -12,8 +12,10 @@ interface MainLayoutProps {
 export default function MainLayout({ children, className }: MainLayoutProps) {
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar className="hidden lg:flex" />
-      <main className={cn("flex-1 overflow-y-auto", className)}>
+      <div className="fixed inset-y-0 left-0 z-20 hidden lg:block">
+        <Sidebar className="h-screen" />
+      </div>
+      <main className={cn("flex-1 lg:pl-64 overflow-y-auto", className)}>
         {children}
       </main>
     </div>
