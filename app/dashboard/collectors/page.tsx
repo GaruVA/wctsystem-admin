@@ -113,14 +113,8 @@ export default function CollectorsPage() {
         setLoading(true);
         const collectorsData = await getAllCollectors();
         
-        // Temporarily assign random efficiency values for development
-        // This should be replaced with actual API data in production
-        const collectorsWithEfficiency = collectorsData.map(collector => ({
-          ...collector,
-          efficiency: Math.floor(Math.random() * 41) + 60 // Random value between 60-100
-        }));
-        
-        setCollectors(collectorsWithEfficiency);
+        // Use the actual efficiency values from the backend
+        setCollectors(collectorsData);
         
         // Also fetch areas for assigning collectors
         const areasData = await getAllAreasWithBins();
@@ -217,16 +211,9 @@ export default function CollectorsPage() {
       setLoading(true);
       await createCollector(collectorFormData);
       
-      // Refresh the collectors list
+      // Refresh the collectors list with actual data from backend
       const collectorsData = await getAllCollectors();
-      
-      // Add random efficiency for demo purposes
-      const collectorsWithEfficiency = collectorsData.map(collector => ({
-        ...collector,
-        efficiency: Math.floor(Math.random() * 41) + 60 // Random value between 60-100
-      }));
-      
-      setCollectors(collectorsWithEfficiency);
+      setCollectors(collectorsData);
       
       // Close dialog and reset form
       setIsAddDialogOpen(false);
@@ -258,19 +245,9 @@ export default function CollectorsPage() {
       
       await updateCollector(selectedCollector._id, updateData);
       
-      // Refresh the collectors list
+      // Refresh the collectors list with actual data from backend
       const collectorsData = await getAllCollectors();
-      
-      // Preserve efficiency values in the refresh
-      const updatedCollectors = collectorsData.map(collector => {
-        const existingCollector = collectors.find(c => c._id === collector._id);
-        return {
-          ...collector,
-          efficiency: existingCollector?.efficiency || Math.floor(Math.random() * 41) + 60
-        };
-      });
-      
-      setCollectors(updatedCollectors);
+      setCollectors(collectorsData);
       
       // Close dialog and reset
       setIsEditDialogOpen(false);
@@ -293,19 +270,9 @@ export default function CollectorsPage() {
       setLoading(true);
       await deleteCollector(selectedCollector._id);
       
-      // Refresh the collectors list
+      // Refresh the collectors list with actual data from backend
       const collectorsData = await getAllCollectors();
-      
-      // Preserve efficiency values in the refresh
-      const updatedCollectors = collectorsData.map(collector => {
-        const existingCollector = collectors.find(c => c._id === collector._id);
-        return {
-          ...collector,
-          efficiency: existingCollector?.efficiency || Math.floor(Math.random() * 41) + 60
-        };
-      });
-      
-      setCollectors(updatedCollectors);
+      setCollectors(collectorsData);
       
       // Close dialog and reset
       setIsDeleteDialogOpen(false);
@@ -327,19 +294,9 @@ export default function CollectorsPage() {
       setLoading(true);
       await updateCollectorStatus(selectedCollector._id, { status });
       
-      // Refresh the collectors list
+      // Refresh the collectors list with actual data from backend
       const collectorsData = await getAllCollectors();
-      
-      // Preserve efficiency values in the refresh
-      const updatedCollectors = collectorsData.map(collector => {
-        const existingCollector = collectors.find(c => c._id === collector._id);
-        return {
-          ...collector,
-          efficiency: existingCollector?.efficiency || Math.floor(Math.random() * 41) + 60
-        };
-      });
-      
-      setCollectors(updatedCollectors);
+      setCollectors(collectorsData);
       
       // Close dialog and reset
       setIsStatusDialogOpen(false);
@@ -364,19 +321,9 @@ export default function CollectorsPage() {
       setLoading(true);
       await assignCollectorToArea(selectedCollector._id, areaId);
       
-      // Refresh the collectors list
+      // Refresh the collectors list with actual data from backend
       const collectorsData = await getAllCollectors();
-      
-      // Preserve efficiency values in the refresh
-      const updatedCollectors = collectorsData.map(collector => {
-        const existingCollector = collectors.find(c => c._id === collector._id);
-        return {
-          ...collector,
-          efficiency: existingCollector?.efficiency || Math.floor(Math.random() * 41) + 60
-        };
-      });
-      
-      setCollectors(updatedCollectors);
+      setCollectors(collectorsData);
       
       // Close dialog and reset
       setIsAssignDialogOpen(false);
@@ -845,7 +792,7 @@ export default function CollectorsPage() {
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="on-leave">On Leave</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
+                    </SelectContent>
                 </Select>
               </div>
             </div>
