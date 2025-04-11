@@ -402,7 +402,10 @@ export default function CollectorsPage() {
               <SelectItem value="inactive">Inactive</SelectItem>
             </SelectContent>
           </Select>
-          <Button size={"sm"} onClick={() => setIsAddDialogOpen(true)}>
+          <Button size={"sm"} onClick={() => {
+            resetFormData();  // Reset form data before opening the dialog
+            setIsAddDialogOpen(true);
+          }}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add Collector
           </Button>
