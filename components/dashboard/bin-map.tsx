@@ -71,7 +71,7 @@ const BinMap: React.FC<BinMapProps> = ({
   }, [areas, colorByArea]);
 
   // Custom icon for bins
-  const createBinIcon = (fillLevel: number, wasteTypes?: string, areaId?: string) => {
+  const createBinIcon = (fillLevel: number, wasteType?: string, areaId?: string) => {
     // Fill level colors (primary color indicator)
     const getFillLevelColor = (level: number) => {
       if (level >= 90) return '#EF4444'; // Red
@@ -118,7 +118,7 @@ const BinMap: React.FC<BinMapProps> = ({
             border-radius: 2px;
             padding: 0 2px;
           ">
-            ${wasteTypes ? wasteTypes.substring(0, 3) : 'N/A'}
+            ${wasteType ? wasteType.substring(0, 3) : 'N/A'}
           </div>
         </div>
       `,
@@ -318,7 +318,7 @@ const BinMap: React.FC<BinMapProps> = ({
     binMarkersRef.current = allBins.map(({ bin, areaId }) => {
       const marker = L.marker(
         [bin.location.coordinates[1], bin.location.coordinates[0]], 
-        { icon: createBinIcon(bin.fillLevel, bin.wasteTypes, areaId) }
+        { icon: createBinIcon(bin.fillLevel, bin.wasteType, areaId) }
       );
       
       // Add interactions (click, double click)

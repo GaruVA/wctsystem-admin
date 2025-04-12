@@ -259,7 +259,7 @@ export default function SchedulePage() {
             fillLevel: 0,
             lastCollected: new Date().toISOString(),
             address: "Unknown",
-            wasteTypes: "GENERAL",
+            wasteType: "GENERAL",
             sequenceNumber: index + 1,
             estimatedArrival: new Date(Date.now() + (30 * 60 * 1000) * index).toISOString()
           };
@@ -939,7 +939,7 @@ export default function SchedulePage() {
                               <div className="flex justify-between items-start">
                                 <p className="font-medium">{bin._id}</p>
                                 <Badge variant="outline" className="ml-2">
-                                  {bin.wasteTypes.charAt(0) + bin.wasteTypes.slice(1).toLowerCase()}
+                                  {bin.wasteType.charAt(0) + bin.wasteType.slice(1).toLowerCase()}
                                 </Badge>
                               </div>
                               <p className="text-xs text-muted-foreground">{bin.address}</p>
@@ -1093,7 +1093,7 @@ export default function SchedulePage() {
                         <div className="flex justify-between items-start">
                           <p className="font-medium">{bin._id}</p>
                           <Badge variant="outline" className="ml-2">
-                            {bin.wasteTypes.charAt(0) + bin.wasteTypes.slice(1).toLowerCase()}
+                            {bin.wasteType.charAt(0) + bin.wasteType.slice(1).toLowerCase()}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground">{bin.address}</p>
