@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { getAllAreasWithBins, AreaWithBins, Bin } from "@/lib/api/areas";
 import { cn } from "@/lib/utils";
+import { getUnreadAlerts, Alert, AlertSeverity, AlertType, markAsRead, markAllAsRead } from "@/lib/api/alerts";
+import { toast } from "@/components/ui/use-toast";
 
 const api = axios.create({
   baseURL: "http://localhost:5000/api",
@@ -36,15 +38,6 @@ interface AnalyticsData {
     bins: number;
     wasteTypeDistribution: Record<string, number>;
   };
-}
-
-interface Alert {
-  id: string;
-  title: string;
-  description: string;
-  time: string;
-  severity: 'high' | 'medium' | 'low';
-  type: string;
 }
 
 interface Issue {
@@ -80,7 +73,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchAnalytics();
     fetchAreas();
-    generateMockAlerts(); // Replace with real alerts API when available
+    fetchAlerts(); // Use real alerts API now instead of mock data
   }, []);
 
   useEffect(() => {
@@ -184,36 +177,57 @@ export default function DashboardPage() {
     }
   };
 
-  // Generate mock alerts - replace with real API call when available
-  const generateMockAlerts = () => {
-    const mockAlerts: Alert[] = [
-      {
-        id: '1',
-        title: 'Critical Bin Level',
-        description: 'Bin HZ-789 has reached 95% capacity in Wellawatte South',
-        time: '2 minutes ago',
-        severity: 'high',
-        type: 'bin'
-      },
-      {
-        id: '2',
-        title: 'Collection Route Completed',
-        description: 'Collector John Smith has completed Route #34',
-        time: '15 minutes ago',
-        severity: 'medium',
-        type: 'route'
-      },
-      {
-        id: '3',
-        title: 'System Maintenance',
-        description: 'Scheduled maintenance on April 10, 2025 from 2-4am',
-        time: '1 hour ago',
-        severity: 'low',
-        type: 'system'
-      }
-    ];
-
-    setAlerts(mockAlerts);
+  // Fetch real alerts from the API
+  const fetchAlerts = async () => {
+    try {
+      const alertsData = await getUnreadAlerts();
+      setAlerts(alertsData);
+    } catch (err) {
+      console.error('Error fetching alerts:', err);
+      toast({
+        title: "Error fetching alerts",
+        description: "Could not retrieve the latest alerts",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Handle clearing a single alert
+  const handleClearAlert = async (alertId: string) => {
+    try {
+      await markAsRead(alertId);
+      setAlerts(alerts.filter(alert => alert._id !== alertId));
+      toast({
+        title: "Alert cleared",
+        description: "The alert has been marked as read",
+      });
+    } catch (err) {
+      console.error('Error clearing alert:', err);
+      toast({
+        title: "Error clearing alert",
+        description: "Could not mark the alert as read",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Handle clearing all alerts
+  const handleClearAllAlerts = async () => {
+    try {
+      await markAllAsRead();
+      setAlerts([]);
+      toast({
+        title: "All alerts cleared",
+        description: "All alerts have been marked as read",
+      });
+    } catch (err) {
+      console.error('Error clearing all alerts:', err);
+      toast({
+        title: "Error clearing alerts",
+        description: "Could not mark all alerts as read",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleBinSelect = (bin: Bin | null) => {
@@ -231,20 +245,39 @@ export default function DashboardPage() {
     ? areas.filter(area => area.areaID === selectedArea)
     : areas;
 
-  const getAlertIcon = (severity: string, type: string) => {
-    if (type === 'bin') return <Trash2 className="h-5 w-5" />;
-    if (type === 'route') return <Truck className="h-5 w-5" />;
-    if (type === 'system') return <AlertCircle className="h-5 w-5" />;
-    return <AlertTriangle className="h-5 w-5" />;
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case AlertType.BIN_FILL_LEVEL: return <Trash2 className="h-5 w-5" />;
+      case AlertType.AREA_FILL_LEVEL: return <Map className="h-5 w-5" />;
+      case AlertType.MISSED_COLLECTION: return <Truck className="h-5 w-5" />;
+      default: return <AlertTriangle className="h-5 w-5" />;
+    }
   };
 
   const getAlertColor = (severity: string) => {
     switch (severity) {
-      case 'high': return 'text-red-500 bg-red-100';
-      case 'medium': return 'text-amber-500 bg-amber-100';
-      case 'low': return 'text-blue-500 bg-blue-100';
+      case AlertSeverity.HIGH: return 'text-red-500 bg-red-100';
+      case AlertSeverity.MEDIUM: return 'text-amber-500 bg-amber-100';
+      case AlertSeverity.LOW: return 'text-blue-500 bg-blue-100';
       default: return 'text-gray-500 bg-gray-100';
     }
+  };
+
+  // Format relative time for alerts
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
   };
 
   useEffect(() => {
@@ -278,7 +311,7 @@ export default function DashboardPage() {
             onClick={() => {
               fetchAnalytics();
               fetchAreas();
-              generateMockAlerts();
+              fetchAlerts();
             }}
             disabled={loading || areasLoading}
           >
@@ -413,49 +446,76 @@ export default function DashboardPage() {
 
           {/* Real-time alerts container */}
           <Card className="col-span-3 md:col-span-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle size={18} className="text-amber-500" />
-                Real-time Alerts
-              </CardTitle>
-              <CardDescription>
-                System notifications and important updates
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle size={18} className="text-amber-500" />
+                  Real-time Alerts
+                </CardTitle>
+                <CardDescription>
+                  System notifications and important updates
+                </CardDescription>
+              </div>
+              {alerts.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearAllAlerts}
+                >
+                  Clear All
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {alerts.map((alert) => (
+                {alerts.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">No alerts at this time.</p>
+                  </div>
+                ) : alerts.map((alert) => (
                   <div
-                    key={alert.id}
+                    key={alert._id}
                     className={cn(
                       "flex items-start gap-4 rounded-md border p-3",
-                      alert.severity === "high"
+                      alert.severity === AlertSeverity.HIGH
                         ? "border-red-200 bg-red-50"
-                        : alert.severity === "medium"
+                        : alert.severity === AlertSeverity.MEDIUM
                           ? "border-yellow-200 bg-yellow-50"
                           : "border-blue-200 bg-blue-50"
                     )}
                   >
                     <div className={cn(
-                      "p-2 rounded-full",
-                      alert.severity === "high"
-                        ? "text-red-500 bg-red-100"
-                        : alert.severity === "medium"
-                          ? "text-yellow-500 bg-yellow-100"
-                          : "text-blue-500 bg-blue-100"
+                      "p-2 rounded-full flex-shrink-0",
+                      getAlertColor(alert.severity)
                     )}>
-                      {getAlertIcon(alert.severity, alert.type)}
+                      {getAlertIcon(alert.type)}
                     </div>
-                    <div className="grid gap-1">
-                      <p className="text-sm font-medium">{alert.title}</p>
+                    <div className="grid gap-1 flex-1">
+                      <div className="flex justify-between items-start">
+                        <p className="text-sm font-medium">{alert.title}</p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 rounded-full -mt-1 -mr-1"
+                          onClick={() => handleClearAlert(alert._id)}
+                          title="Mark as read"
+                        >
+                          <span className="sr-only">Mark as read</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                          </svg>
+                        </Button>
+                      </div>
                       <p className="text-xs text-muted-foreground">{alert.description}</p>
-                      <p className="text-xs text-muted-foreground">{alert.time}</p>
+                      <p className="text-xs text-muted-foreground">{formatRelativeTime(alert.createdAt)}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
+
         </div>
 
         {/* Issues Section */}
