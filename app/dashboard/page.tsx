@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import BinMap from "@/components/dashboard/bin-map";
-import { AreaStatusOverview } from "@/components/dashboard/area-status-overview";
 import {
   RefreshCcw,
   Trash2,
@@ -24,7 +23,6 @@ import {
 } from "lucide-react";
 import { getAllAreasWithBins, AreaWithBins, Bin } from "@/lib/api/areas";
 import { cn } from "@/lib/utils";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const api = axios.create({
   baseURL: "http://localhost:5000/api",
@@ -510,9 +508,6 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-
-        {/* Area Status Overview */}
-        <AreaStatusOverview />
       </div>
     </div>
   );

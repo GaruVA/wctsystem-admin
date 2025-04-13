@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle, AlertTriangle, Trash2, Recycle, Leaf, AlertOctagon, MapPin } from 'lucide-react';
+import { AlertCircle, CheckCircle, AlertTriangle, Trash2, Recycle, Leaf, AlertOctagon, MapPin, BarChart3 } from 'lucide-react';
 import axios from 'axios';
 
 interface AreaStatus {
@@ -154,7 +154,10 @@ export function AreaStatusOverview() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Area Status Overview</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              <span>Area Status Overview</span>
+          </CardTitle>
           <CardDescription>Current collection status by area</CardDescription>
         </CardHeader>
         <CardContent>
@@ -186,7 +189,10 @@ export function AreaStatusOverview() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Area Status Overview</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              <span>Area Status Overview</span>
+          </CardTitle>
           <CardDescription>Current collection status by area</CardDescription>
         </CardHeader>
         <CardContent>
@@ -202,7 +208,10 @@ export function AreaStatusOverview() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Area Status Overview</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              <span>Area Status Overview</span>
+          </CardTitle>
         <CardDescription>Current collection status by area</CardDescription>
       </CardHeader>
       <CardContent>

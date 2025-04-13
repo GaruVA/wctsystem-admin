@@ -57,9 +57,7 @@ import {
 } from "@/lib/api/areas";
 import { 
   getOptimizedRoute, 
-  generateCustomRoute, 
   saveRouteSchedule,
-  adjustExistingRoute, 
   OptimizedRoute,
   RouteParameters
 } from "@/lib/api/routes";
@@ -587,7 +585,7 @@ export default function SchedulePage() {
           <Card className="md:col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings size={18} />
+                <Route size={18} />
                 Route Parameters
               </CardTitle>
               <CardDescription>

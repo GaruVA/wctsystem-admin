@@ -13,7 +13,8 @@ import {
   Users, 
   Settings, 
   LogOut, 
-  Trash2 
+  Trash2,
+  Map
 } from "lucide-react"
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
@@ -26,6 +27,11 @@ export default function Sidebar({ className }: SidebarProps) {
       name: "Dashboard",
       path: "/dashboard",
       icon: LayoutDashboard,
+    },
+    {
+      name: "Areas",
+      path: "/dashboard/areas",
+      icon: Map,
     },
     {
       name: "Routes",
@@ -90,8 +96,7 @@ export default function Sidebar({ className }: SidebarProps) {
           className={cn(
             "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
             "text-muted-foreground hover:bg-muted hover:text-foreground"
-          )}
-        >
+          )}>
           <LogOut className="h-4 w-4" />
           Logout
         </Link>
