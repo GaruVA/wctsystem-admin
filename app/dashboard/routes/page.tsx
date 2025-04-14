@@ -714,13 +714,35 @@ export default function SchedulePage() {
                     <SelectValue placeholder="Select collector" />
                   </SelectTrigger>
                   <SelectContent>
-                    {collectors.filter(c => c.status === 'active').map((collector) => (
-                      <SelectItem key={collector._id} value={collector._id}>
-                        {collector.firstName ? `${collector.firstName} ${collector.lastName || ''}` : collector.username}
+                    {collectors
+                      .filter(c => 
+                        // Only show collectors who are:
+                        // 1. Active AND
+                        // 2. Assigned to the current area
+                        c.status === 'active' && 
+                        (c.area?._id === currentRoute.area.id || (typeof c.area === 'string' && c.area === currentRoute.area.id))
+                      )
+                      .map((collector) => (
+                        <SelectItem 
+                          key={collector._id} 
+                          value={collector._id}
+                        >
+                          {collector.firstName ? `${collector.firstName} ${collector.lastName || ''}` : collector.username}
+                        </SelectItem>
+                      ))}
+                    {collectors.filter(c => 
+                      c.status === 'active' && 
+                      (c.area?._id === currentRoute.area.id || (typeof c.area === 'string' && c.area === currentRoute.area.id))
+                    ).length === 0 && (
+                      <SelectItem value="no-collectors" disabled>
+                        No available collectors for this area
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Only showing active collectors assigned to this area
+                </p>
               </div>
 
               <div className="space-y-3">
