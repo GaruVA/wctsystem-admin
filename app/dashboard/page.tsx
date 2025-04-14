@@ -10,6 +10,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import BinMap from "@/components/dashboard/bin-map";
 import {
   RefreshCcw,
@@ -48,6 +49,17 @@ interface Issue {
   createdAt: string;
 }
 
+interface BinSuggestion {
+  _id: string;
+  reason: string;
+  location: {
+    longitude: number;
+    latitude: number;
+  };
+  address?: string; // Added optional address property
+  createdAt: string;
+}
+
 export default function DashboardPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +72,10 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [issuesLoading, setIssuesLoading] = useState(true);
+  const [binSuggestions, setBinSuggestions] = useState<BinSuggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(true);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<BinSuggestion | null>(null);
+  const [suggestionBins, setSuggestionBins] = useState<Bin[]>([]); // New state for suggestion bins formatted for map
 
   const [overallStats, setOverallStats] = useState({
     avgUtilization: 0,
@@ -295,6 +311,104 @@ export default function DashboardPage() {
     fetchIssues();
   }, []);
 
+  useEffect(() => {
+    const fetchBinSuggestions = async () => {
+      try {
+        setSuggestionsLoading(true);
+        const response = await axios.get<BinSuggestion[]>("http://localhost:5000/api/bin-suggestions", {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+          },
+        });
+        setBinSuggestions(response.data);
+      } catch (error) {
+        console.error("Error fetching bin suggestions:", error);
+        // For development, add mock data if the API isn't available yet
+        setBinSuggestions([
+          {
+            _id: "s1",
+            reason: "High population density area with insufficient waste disposal",
+            location: { longitude: 79.861, latitude: 6.927 },
+            createdAt: new Date().toISOString()
+          },
+          {
+            _id: "s2",
+            reason: "New residential complex without adequate waste bins",
+            location: { longitude: 79.865, latitude: 6.932 },
+            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            _id: "s3",
+            reason: "Commercial area with high waste generation",
+            location: { longitude: 79.858, latitude: 6.925 },
+            createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        ]);
+      } finally {
+        setSuggestionsLoading(false);
+      }
+    };
+
+    fetchBinSuggestions();
+  }, []);
+
+  useEffect(() => {
+    // Convert bin suggestions to map-compatible format when they're loaded
+    if (binSuggestions.length > 0) {
+      const formattedSuggestions = binSuggestions.map(suggestion => createSuggestionBin(suggestion));
+      setSuggestionBins(formattedSuggestions);
+    }
+  }, [binSuggestions]);
+
+  // Create suggestion bins for the map when a suggestion is selected
+  const createSuggestionBin = (suggestion: BinSuggestion): any => {
+    return {
+      _id: suggestion._id,
+      name: "Suggested Bin",
+      binID: `suggestion-${suggestion._id}`,
+      location: {
+        type: "Point",
+        coordinates: [suggestion.location.longitude, suggestion.location.latitude]
+      },
+      fillLevel: 0,
+      wasteType: "GENERAL",
+      status: "ACTIVE",
+      lastEmptied: new Date().toISOString(),
+      createdAt: suggestion.createdAt,
+      updatedAt: suggestion.createdAt,
+      address: suggestion.address || "",
+      isSuggestion: true,
+      reason: suggestion.reason
+    };
+  };
+
+  const handleRejectSuggestion = async (suggestionId: string) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/bin-suggestions/${suggestionId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+      });
+      
+      // Remove the rejected suggestion from state
+      setBinSuggestions(prev => prev.filter(suggestion => suggestion._id !== suggestionId));
+      
+      // Show success toast
+      toast({
+        title: "Suggestion rejected",
+        description: "The bin suggestion has been removed.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error rejecting bin suggestion:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reject bin suggestion. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
@@ -387,11 +501,16 @@ export default function DashboardPage() {
               <CardTitle className="flex items-center gap-2">
                 <Map size={18} />
                 Waste Collection Areas
+                {selectedSuggestion && (
+                  <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-700">
+                    Viewing Bin Suggestion
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
                 Collection areas with bin locations and boundaries
               </CardDescription>
-            </CardHeader>
+                          </CardHeader>
             <CardContent className="p-0 h-[438px]">
               {areasLoading && (
                 <div className="flex justify-center items-center h-full">
@@ -431,13 +550,14 @@ export default function DashboardPage() {
                       </button>
                     ))}
                   </div>
-
+                  
                   <BinMap
                     areas={filteredAreas}
-                    fitToAreas={true}
+                    suggestionBins={suggestionBins}
+                    fitToAreas={!selectedSuggestion}
                     onBinSelect={handleBinSelect}
                     selectedBin={selectedBin}
-                    style={{ height: "395px" }}
+                    style={{ height: "430px" }}
                   />
                 </>
               )}
@@ -518,56 +638,154 @@ export default function DashboardPage() {
 
         </div>
 
-        {/* Issues Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle size={20} className="text-red-500" />
-              Reported Issues
-            </CardTitle>
-            <CardDescription>
-              A detailed list of reported issues in the system.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {issuesLoading ? (
-              <div className="flex justify-center items-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                <span className="ml-2 text-sm text-muted-foreground">Loading issues...</span>
-              </div>
-            ) : issues.length === 0 ? (
-              <div className="text-center py-4">
-                <p className="text-sm text-muted-foreground">No issues reported.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {issues.map((issue) => (
-                  <div
-                    key={issue._id}
-                    className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
-                      <AlertTriangle size={20} />
+        {/* Issues and Bin Suggestions Grid */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Issues Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle size={20} className="text-red-500" />
+                Reported Issues
+              </CardTitle>
+              <CardDescription>
+                A detailed list of reported issues in the system.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {issuesLoading ? (
+                <div className="flex justify-center items-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                  <span className="ml-2 text-sm text-muted-foreground">Loading issues...</span>
+                </div>
+              ) : issues.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">No issues reported.</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                  {issues.map((issue) => (
+                    <div
+                      key={issue._id}
+                      className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
+                        <AlertTriangle size={20} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium text-gray-800">
+                          {issue.issueType}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          {issue.description || "No description provided"}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          <strong>Bin:</strong> {issue.bin?.name || "Unknown"} |{" "}
+                          <strong>Reported At:</strong>{" "}
+                          {new Date(issue.createdAt).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm font-medium text-gray-800">
-                        {issue.issueType}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {issue.description || "No description provided"}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        <strong>Bin:</strong> {issue.bin?.name || "Unknown"} |{" "}
-                        <strong>Reported At:</strong>{" "}
-                        {new Date(issue.createdAt).toLocaleString()}
-                      </p>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Bin Location Suggestions Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Map size={20} className="text-blue-500" />
+                Bin Location Suggestions
+              </CardTitle>
+              <CardDescription>
+                Suggested locations for new waste bins based on community feedback.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {suggestionsLoading ? (
+                <div className="flex justify-center items-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                  <span className="ml-2 text-sm text-muted-foreground">Loading suggestions...</span>
+                </div>
+              ) : binSuggestions.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">No bin location suggestions available.</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                  {binSuggestions.map((suggestion) => (
+                    <div
+                      key={suggestion._id}
+                      className={`flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow ${selectedSuggestion?._id === suggestion._id ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+                    >
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-500">
+                        <Map size={20} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium text-gray-800">
+                          {suggestion.address ? (
+                            <>{suggestion.address}</>
+                          ) : (
+                            <>Location: {suggestion.location.latitude.toFixed(6)}, {suggestion.location.longitude.toFixed(6)}</>
+                          )}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          {suggestion.reason}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          <strong>Coordinates:</strong> {suggestion.location.latitude.toFixed(4)}, {suggestion.location.longitude.toFixed(4)} |{" "}
+                          <strong>Suggested:</strong>{" "}
+                          {formatRelativeTime(suggestion.createdAt)}
+                        </p>
+                        <div className="mt-2 flex gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              // Find the suggestion bin in the formatted bins
+                              const binToView = suggestionBins.find(bin => bin._id === suggestion._id);
+                              
+                              // First select the suggestion to highlight it on the map
+                              setSelectedBin(binToView || null);
+                              
+                              // Then set the selectedSuggestion to allow the map to zoom to it
+                              setSelectedSuggestion(suggestion);
+                            }}
+                          >
+                            View on Map
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="default" 
+                            className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                          >
+                            Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              // If this suggestion is currently selected, deselect it first
+                              if (selectedSuggestion?._id === suggestion._id) {
+                                setSelectedSuggestion(null);
+                              }
+                              handleRejectSuggestion(suggestion._id);
+                            }}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

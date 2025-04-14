@@ -25,6 +25,13 @@ interface BinMapProps {
   selectedBin?: Bin | null;
   style?: React.CSSProperties;
   colorByArea?: boolean;
+  suggestionBins?: Bin[]; // Add prop for suggestion bins
+}
+
+// Extend the Bin type to include suggestion-specific properties
+interface ExtendedBin extends Bin {
+  isSuggestion?: boolean;
+  reason?: string;
 }
 
 const BinMap: React.FC<BinMapProps> = ({
@@ -42,9 +49,11 @@ const BinMap: React.FC<BinMapProps> = ({
   onBinDoubleClick,
   selectedBin = null,
   style,
-  colorByArea = true
+  colorByArea = true,
+  suggestionBins = [] // Add default empty array for suggestion bins
 }) => {
   const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
   const binMarkersRef = useRef<L.Marker[]>([]);
   const routePolylineRef = useRef<L.Polyline | null>(null);
   const currentSegmentPolylineRef = useRef<L.Polyline | null>(null);
@@ -71,7 +80,7 @@ const BinMap: React.FC<BinMapProps> = ({
   }, [areas, colorByArea]);
 
   // Custom icon for bins
-  const createBinIcon = (fillLevel: number, wasteType?: string, areaId?: string) => {
+  const createBinIcon = (fillLevel: number, wasteType?: string, areaId?: string, isSuggestion?: boolean) => {
     // Fill level colors (primary color indicator)
     const getFillLevelColor = (level: number) => {
       if (level >= 90) return '#EF4444'; // Red
@@ -80,8 +89,40 @@ const BinMap: React.FC<BinMapProps> = ({
       return '#10B981'; // Green
     };
 
-    const fillLevelColor = getFillLevelColor(fillLevel);
+    // For suggestion bins, use a special blue color
+    const fillLevelColor = isSuggestion ? '#3B82F6' : getFillLevelColor(fillLevel);
 
+    // For suggestion bins, use a different icon style
+    if (isSuggestion) {
+      return L.divIcon({
+        className: 'custom-suggestion-marker',
+        html: `
+          <div style="
+          margin-top: 18px;
+            width: 32px;
+            height: 32px;
+            background-color: #3B82F6;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+          ">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash">
+              <path d="M3 6h18"></path>
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            </svg>
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 34]
+      });
+    }
+
+    // Regular bin icon
     return L.divIcon({
       className: 'custom-bin-marker',
       html: `
@@ -91,6 +132,7 @@ const BinMap: React.FC<BinMapProps> = ({
           height: 28px;
         ">
           <div style="
+          margin-top: 3px;
             width: 24px;
             height: 24px;
             background-color: ${fillLevelColor};
@@ -165,7 +207,13 @@ const BinMap: React.FC<BinMapProps> = ({
             <span>≥ 90% - Critical</span>
           </div>
           
-          <div style="font-weight: bold; margin-bottom: 5px;">Waste Types</div>
+          <div style="font-weight: bold; margin-bottom: 5px;">Bin Types</div>
+          <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 15px; height: 15px; background-color: #3B82F6; border-radius: 50%; margin-right: 5px;"></div>
+            <span>Suggested Bin</span>
+          </div>
+          
+          <div style="font-weight: bold; margin-bottom: 5px; margin-top: 10px;">Waste Types</div>
           <div style="font-size: 11px; margin-top: 3px;">
             <span class="font-medium">GEN</span> - General
           </div>
@@ -188,9 +236,9 @@ const BinMap: React.FC<BinMapProps> = ({
 
   // Initialize map
   useEffect(() => {
-    if (!mapRef.current && !mapInitializedRef.current) {
+    if (!mapRef.current && !mapInitializedRef.current && mapContainerRef.current) {
       // Default to Sri Lanka coordinates if no specific location is provided
-      const map = L.map('map-container', {
+      const map = L.map(mapContainerRef.current, {
         center: [7.8731, 80.7718], // Sri Lanka center
         zoom: 9
       });
@@ -289,7 +337,7 @@ const BinMap: React.FC<BinMapProps> = ({
     areaPolygonsRef.current = [];
 
     // Collect all bins to display
-    let allBins: { bin: Bin; areaId?: string }[] = [];
+    let allBins: { bin: ExtendedBin; areaId?: string }[] = [];
     
     // Add bins from areas
     if (areas.length > 0) {
@@ -310,18 +358,49 @@ const BinMap: React.FC<BinMapProps> = ({
     // Add loose bins if provided
     if (bins.length > 0) {
       bins.forEach(bin => {
-        allBins.push({ bin });
+        allBins.push({ bin: bin as ExtendedBin });
+      });
+    }
+    
+    // Add suggestion bins if provided
+    if (suggestionBins && suggestionBins.length > 0) {
+      suggestionBins.forEach(bin => {
+        allBins.push({ bin: { ...bin, isSuggestion: true } as ExtendedBin });
       });
     }
 
     // Create bin markers
     binMarkersRef.current = allBins.map(({ bin, areaId }) => {
+      const isSuggestion = (bin as ExtendedBin).isSuggestion || false;
+      
       const marker = L.marker(
         [bin.location.coordinates[1], bin.location.coordinates[0]], 
-        { icon: createBinIcon(bin.fillLevel, bin.wasteType, areaId) }
+        { icon: createBinIcon(bin.fillLevel, bin.wasteType, areaId, isSuggestion) }
       );
       
-      // Add interactions (click, double click)
+      // For suggestion bins, add a special popup with more info
+      if (isSuggestion) {
+        marker.bindPopup(`
+          <div style="min-width: 200px">
+            <h3 style="font-size: 16px; margin-bottom: 5px; font-weight: 600;">Suggested Bin Location</h3>
+            ${bin.address ? `<p style="margin: 5px 0"><strong>Address:</strong> ${bin.address}</p>` : ''}
+            <p style="margin: 5px 0"><strong>Coordinates:</strong> ${bin.location.coordinates[1].toFixed(6)}, ${bin.location.coordinates[0].toFixed(6)}</p>
+            ${(bin as ExtendedBin).reason ? `<p style="margin: 5px 0"><strong>Reason:</strong> ${(bin as ExtendedBin).reason}</p>` : ''}
+          </div>
+        `);
+        
+        // Add a circle to highlight the suggested bin area
+        if (mapRef.current) {
+          L.circle([bin.location.coordinates[1], bin.location.coordinates[0]], {
+            color: '#3B82F6',
+            fillColor: '#93C5FD',
+            fillOpacity: 0.2,
+            radius: 100 // 100m radius
+          }).addTo(mapRef.current);
+        }
+      }
+      
+      // Add interactions (click, double click) for all bins including suggestions
       addBinMarkerInteractions(marker, bin);
       
       // Add to map
@@ -472,14 +551,15 @@ const BinMap: React.FC<BinMapProps> = ({
     singleArea,
     optimizedRoute, 
     currentSegment, 
-    selectedBin, 
     fitToRoute, 
     fitToCurrentSegment, 
     fitToAreas,
     onBinSelect,
-    onBinDoubleClick, // Add to dependency array
+    onBinDoubleClick,
     areaColors,
-    colorByArea
+    colorByArea,
+    suggestionBins,
+    selectedBin
   ]);
 
   // Add current location marker if provided
@@ -525,7 +605,7 @@ const BinMap: React.FC<BinMapProps> = ({
 
   return (
     <div 
-      id="map-container" 
+      ref={mapContainerRef}
       style={{ 
         height: '600px', 
         width: '100%', 
