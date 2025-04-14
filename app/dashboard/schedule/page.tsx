@@ -100,11 +100,13 @@ const ScheduleDetailsDialog = ({
   useEffect(() => {
     if (schedule?._id && isOpen) {
       setIsLoading(true);
-      getScheduleById(schedule._id)
+      // Update to request bin data using the populateBins query parameter
+      getScheduleById(schedule._id, true)
         .then(data => {
           console.log("Schedule details fetched:", data);
           console.log("Area info:", data.area);
           console.log("Collector info:", data.collector);
+          console.log("Bins:", data.binSequence);
           setDetailedSchedule(data);
         })
         .catch(err => console.error("Error fetching schedule details:", err))
@@ -156,6 +158,9 @@ const ScheduleDetailsDialog = ({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="rounded-lg border bg-white text-card-foreground shadow-sm sm:max-w-[900px] p-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{scheduleName}</DialogTitle>
+          </DialogHeader>
           <div className="flex flex-col space-y-1.5 p-6 pb-2">
             <div className="flex justify-between items-start">
               <div>
@@ -322,7 +327,10 @@ const ScheduleDetailsDialog = ({
                       {detailedSchedule.route && detailedSchedule.route.length > 0 ? (
                         <BinMap 
                           optimizedRoute={detailedSchedule.route}
-                          bins={[]}
+                          bins={Array.isArray(detailedSchedule.binSequence) 
+                            ? detailedSchedule.binSequence
+                                .filter((bin): bin is any => typeof bin === 'object' && bin !== null && '_id' in bin)
+                            : []}
                           style={{ height: "500px", width: "100%" }}
                           fitToRoute={true}
                         />
@@ -347,28 +355,78 @@ const ScheduleDetailsDialog = ({
                       <CardContent>
                         {(detailedSchedule.binSequence || []).length > 0 ? (
                           <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 max-h-[400px] overflow-y-auto pr-2">
-                            {(detailedSchedule.binSequence || []).map((binId: string, index: number) => (
-                              <div key={binId} className="flex items-center p-4 border bg-muted/30 rounded-lg">
-                                <div className="flex items-center justify-center w-9 h-9 bg-primary/10 text-primary rounded-full mr-3 font-semibold">
-                                  {index + 1}
-                                </div>
-                                <div className="flex-grow">
-                                  <p className="font-medium text-sm">{binId}</p>
-                                  <div className="flex items-center mt-1">
-                                    <Clock className="h-3.5 w-3.5 text-muted-foreground mr-1" />
-                                    <span className="text-xs text-muted-foreground">
-                                      Estimated arrival: {
-                                        detailedSchedule.startTime ? 
-                                        format(
-                                          new Date(new Date(detailedSchedule.startTime).getTime() + (index * 10 * 60000)),
-                                          "h:mm a"
-                                        ) : 'Not available'
-                                      }
-                                    </span>
+                            {(detailedSchedule.binSequence || []).map((bin: any, index: number) => {
+                              // Check if bin is a full object (populated) or just an ID string
+                              const isBinObject = bin && typeof bin !== 'string' && bin._id;
+                              const binId = isBinObject ? bin._id : bin;
+                              
+                              // Format fill level color
+                              const getFillLevelColor = (level: number) => {
+                                if (level >= 90) return "bg-red-500 text-white";
+                                if (level >= 70) return "bg-amber-500 text-white";
+                                if (level >= 50) return "bg-yellow-500 text-black";
+                                return "bg-green-500 text-white";
+                              };
+
+                              return (
+                                <div 
+                                  key={binId} 
+                                  className={`flex items-start p-4 border rounded-lg ${isBinObject ? 'bg-white shadow-sm' : 'bg-muted/30'}`}
+                                >
+                                  <div className="flex items-center justify-center w-9 h-9 bg-primary/10 text-primary rounded-full mr-3 font-semibold flex-shrink-0">
+                                    {index + 1}
+                                  </div>
+                                  <div className="flex-grow">
+                                    {isBinObject ? (
+                                      <>
+                                        <div className="flex justify-between items-start">
+                                          <p className="font-medium text-sm">{binId}</p>
+                                          <Badge variant="outline" className="ml-2">
+                                            {bin.wasteType ? (bin.wasteType.charAt(0) + bin.wasteType.slice(1).toLowerCase()) : 'General'}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-1">{bin.address || 'Unknown address'}</p>
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                                          <div className="flex items-center">
+                                            <div className={`w-2.5 h-2.5 rounded-full mr-1.5 ${getFillLevelColor(bin.fillLevel || 0)}`} />
+                                            <span className="text-xs">{bin.fillLevel || 0}% Full</span>
+                                          </div>
+                                          <div className="flex items-center">
+                                            <Clock className="h-3.5 w-3.5 text-muted-foreground mr-1" />
+                                            <span className="text-xs text-muted-foreground">
+                                              {detailedSchedule.startTime ? 
+                                                format(
+                                                  new Date(new Date(detailedSchedule.startTime).getTime() + (index * 10 * 60000)),
+                                                  "h:mm a"
+                                                ) : 'Not available'}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        {bin.lastCollected && (
+                                          <div className="mt-1 text-xs text-slate-500">
+                                            Last collected: {format(new Date(bin.lastCollected), "MMM d, yyyy")}
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <p className="font-medium text-sm">{binId}</p>
+                                        <div className="flex items-center mt-1">
+                                          <Clock className="h-3.5 w-3.5 text-muted-foreground mr-1" />
+                                          <span className="text-xs text-muted-foreground">
+                                            {detailedSchedule.startTime ? 
+                                              format(
+                                                new Date(new Date(detailedSchedule.startTime).getTime() + (index * 10 * 60000)),
+                                                "h:mm a"
+                                              ) : 'Not available'}
+                                          </span>
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         ) : (
                           <div className="h-36 flex items-center justify-center bg-muted/50 rounded-lg">
