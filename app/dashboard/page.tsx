@@ -1,7 +1,7 @@
 // filepath: c:\Users\0002288\Desktop\wct\admin\app\dashboard\page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import {
   Card,
@@ -62,8 +62,6 @@ interface BinSuggestion {
 }
 
 export default function DashboardPage() {
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
   const [areas, setAreas] = useState<AreaWithBins[]>([]);
@@ -78,107 +76,10 @@ export default function DashboardPage() {
   const [selectedSuggestion, setSelectedSuggestion] = useState<BinSuggestion | null>(null);
   const [suggestionBins, setSuggestionBins] = useState<Bin[]>([]); // New state for suggestion bins formatted for map
 
-  const [overallStats, setOverallStats] = useState({
-    avgUtilization: 0,
-    totalBins: 0,
-    avgEfficiency: 0,
-    avgDelay: 0,
-    criticalBins: 0,
-    routeCompletion: 75 // Simulated data, replace with actual data when available
-  });
-
   useEffect(() => {
-    fetchAnalytics();
     fetchAreas();
-    fetchAlerts(); // Use real alerts API now instead of mock data
+    fetchAlerts();
   }, []);
-
-  useEffect(() => {
-    if (analytics) {
-      const areas = Object.values(analytics);
-      const totalBins = areas.reduce((acc, area) => acc + area.bins, 0);
-      const avgUtil = areas.reduce((acc, area) => acc + area.utilization, 0) / areas.length;
-      const avgEff = areas.reduce((acc, area) => acc + area.collectionEfficiency, 0) / areas.length;
-      const avgDelay = areas.reduce((acc, area) => acc + area.serviceDelay, 0) / areas.length;
-
-      // Get count of bins with fill level > 80%
-      let criticalBinsCount = 0;
-      areas.forEach(area => {
-        if (area && typeof area === 'object' && 'bins' in area) {
-          const bins = area.bins;
-          if (Array.isArray(bins)) {
-            criticalBinsCount += bins.filter(bin => bin && bin.fillLevel > 80).length;
-          }
-        }
-      });
-
-      setOverallStats({
-        totalBins,
-        avgUtilization: avgUtil,
-        avgEfficiency: avgEff,
-        avgDelay: avgDelay,
-        criticalBins: criticalBinsCount || Math.round(totalBins * 0.15), // Fallback to estimation
-        routeCompletion: 75 // Simulated data
-      });
-    }
-  }, [analytics]);
-
-  const fetchAnalytics = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get("/analytics/analytics", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
-        },
-      });
-      setAnalytics(response.data as AnalyticsData);
-      setError(null);
-    } catch (err: any) {
-      setError("Failed to fetch analytics data");
-
-      // Mock data for development
-      setAnalytics({
-        "Area-001": {
-          utilization: 78,
-          collectionEfficiency: 92,
-          serviceDelay: 12,
-          bins: 34,
-          wasteTypeDistribution: {
-            "GENERAL": 15,
-            "ORGANIC": 8,
-            "RECYCLE": 7,
-            "HAZARDOUS": 4
-          }
-        },
-        "Area-002": {
-          utilization: 65,
-          collectionEfficiency: 87,
-          serviceDelay: 18,
-          bins: 28,
-          wasteTypeDistribution: {
-            "GENERAL": 12,
-            "ORGANIC": 6,
-            "RECYCLE": 7,
-            "HAZARDOUS": 3
-          }
-        },
-        "Area-003": {
-          utilization: 83,
-          collectionEfficiency: 95,
-          serviceDelay: 8,
-          bins: 42,
-          wasteTypeDistribution: {
-            "GENERAL": 20,
-            "ORGANIC": 10,
-            "RECYCLE": 8,
-            "HAZARDOUS": 4
-          }
-        }
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchAreas = async () => {
     try {
@@ -251,13 +152,6 @@ export default function DashboardPage() {
     setSelectedBin(bin);
   };
 
-  const getStatusColor = (value: number, isDelay = false) => {
-    if (isDelay) {
-      return value < 10 ? 'text-green-500' : value < 20 ? 'text-amber-500' : 'text-red-500';
-    }
-    return value > 80 ? 'text-green-500' : value > 60 ? 'text-amber-500' : 'text-red-500';
-  };
-
   const filteredAreas = selectedArea
     ? areas.filter(area => area.areaID === selectedArea)
     : areas;
@@ -296,11 +190,10 @@ export default function DashboardPage() {
     const diffDays = Math.floor(diffHours / 24);
     return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
   };
-
   useEffect(() => {
     const fetchIssues = async () => {
       try {
-        const response = await axios.get<Issue[]>("http://localhost:5000/api/issue"); // Replace with your backend URL
+        const response = await axios.get<Issue[]>("http://localhost:5000/api/issue");
         setIssues(response.data);
       } catch (error) {
         console.error("Error fetching issues:", error);
@@ -311,6 +204,17 @@ export default function DashboardPage() {
 
     fetchIssues();
   }, []);
+
+  // Create a Set of bin IDs that have issues for easy lookup
+  const binsWithIssues = React.useMemo(() => {
+    const issuesBinIds = new Set<string>();
+    issues.forEach(issue => {
+      if (issue.bin && issue.bin._id) {
+        issuesBinIds.add(issue.bin._id);
+      }
+    });
+    return issuesBinIds;
+  }, [issues]);
 
   useEffect(() => {
     const fetchBinSuggestions = async () => {
@@ -324,27 +228,6 @@ export default function DashboardPage() {
         setBinSuggestions(response.data);
       } catch (error) {
         console.error("Error fetching bin suggestions:", error);
-        // For development, add mock data if the API isn't available yet
-        setBinSuggestions([
-          {
-            _id: "s1",
-            reason: "High population density area with insufficient waste disposal",
-            location: { longitude: 79.861, latitude: 6.927 },
-            createdAt: new Date().toISOString()
-          },
-          {
-            _id: "s2",
-            reason: "New residential complex without adequate waste bins",
-            location: { longitude: 79.865, latitude: 6.932 },
-            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-          },
-          {
-            _id: "s3",
-            reason: "Commercial area with high waste generation",
-            location: { longitude: 79.858, latitude: 6.925 },
-            createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        ]);
       } finally {
         setSuggestionsLoading(false);
       }
@@ -427,7 +310,6 @@ export default function DashboardPage() {
             <Button
               size="sm"
               onClick={() => {
-                fetchAnalytics();
                 fetchAreas();
                 fetchAlerts();
               }}
@@ -500,8 +382,7 @@ export default function DashboardPage() {
                       </button>
                     ))}
                   </div>
-                  
-                  <div className="flex-1 min-h-0">
+                    <div className="flex-1 min-h-0">
                     <BinMap
                       areas={filteredAreas}
                       suggestionBins={suggestionBins}
@@ -509,6 +390,7 @@ export default function DashboardPage() {
                       onBinSelect={handleBinSelect}
                       selectedBin={selectedBin}
                       style={{ height: "100%" }}
+                      binsWithIssues={binsWithIssues}
                     />
                   </div>
                 </div>

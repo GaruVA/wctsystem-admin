@@ -26,6 +26,7 @@ interface BinMapProps {
   style?: React.CSSProperties;
   colorByArea?: boolean;
   suggestionBins?: Bin[]; // Add prop for suggestion bins
+  binsWithIssues?: Set<string>; // Add prop for tracking bins with issues
 }
 
 // Extend the Bin type to include suggestion-specific properties
@@ -50,7 +51,8 @@ const BinMap: React.FC<BinMapProps> = ({
   selectedBin = null,
   style,
   colorByArea = true,
-  suggestionBins = [] // Add default empty array for suggestion bins
+  suggestionBins = [], // Add default empty array for suggestion bins
+  binsWithIssues = new Set() // Add default empty Set for bins with issues
 }) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -78,9 +80,15 @@ const BinMap: React.FC<BinMapProps> = ({
       setAreaColors(colors);
     }
   }, [areas, colorByArea]);
-
   // Custom icon for bins
-  const createBinIcon = (fillLevel: number, wasteType?: string, areaId?: string, isSuggestion?: boolean) => {
+  const createBinIcon = (
+    fillLevel: number, 
+    wasteType?: string, 
+    areaId?: string, 
+    isSuggestion?: boolean,
+    binId?: string,
+    hasIssue?: boolean
+  ) => {
     // Fill level colors (primary color indicator)
     const getFillLevelColor = (level: number) => {
       if (level >= 90) return '#EF4444'; // Red
@@ -120,9 +128,7 @@ const BinMap: React.FC<BinMapProps> = ({
         iconSize: [32, 32],
         iconAnchor: [16, 34]
       });
-    }
-
-    // Regular bin icon
+    }    // Regular bin icon
     return L.divIcon({
       className: 'custom-bin-marker',
       html: `
@@ -131,6 +137,23 @@ const BinMap: React.FC<BinMapProps> = ({
           width: 24px; 
           height: 28px;
         ">
+          ${hasIssue ? `<div style="
+            position: absolute;
+            top: -10px;
+            right: -8px;
+            width: 18px;
+            height: 18px;
+            background-color: #EF4444;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+          ">!</div>` : ''}
           <div style="
           margin-top: 3px;
             width: 24px;
@@ -367,15 +390,25 @@ const BinMap: React.FC<BinMapProps> = ({
       suggestionBins.forEach(bin => {
         allBins.push({ bin: { ...bin, isSuggestion: true } as ExtendedBin });
       });
-    }
-
-    // Create bin markers
+    }    // Create bin markers
     binMarkersRef.current = allBins.map(({ bin, areaId }) => {
       const isSuggestion = (bin as ExtendedBin).isSuggestion || false;
       
+      // Check if this bin has any reported issues
+      const hasIssue = binsWithIssues.has(bin._id);
+      
       const marker = L.marker(
         [bin.location.coordinates[1], bin.location.coordinates[0]], 
-        { icon: createBinIcon(bin.fillLevel, bin.wasteType, areaId, isSuggestion) }
+        { 
+          icon: createBinIcon(
+            bin.fillLevel, 
+            bin.wasteType, 
+            areaId, 
+            isSuggestion,
+            bin._id,
+            hasIssue
+          ) 
+        }
       );
       
       // For suggestion bins, add a special popup with more info
