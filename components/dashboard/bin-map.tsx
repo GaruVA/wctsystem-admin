@@ -98,37 +98,41 @@ const BinMap: React.FC<BinMapProps> = ({
     };
 
     // For suggestion bins, use a special blue color
-    const fillLevelColor = isSuggestion ? '#3B82F6' : getFillLevelColor(fillLevel);
-
-    // For suggestion bins, use a different icon style
+    const fillLevelColor = isSuggestion ? '#3B82F6' : getFillLevelColor(fillLevel);    // For suggestion bins, use a different icon style
     if (isSuggestion) {
       return L.divIcon({
         className: 'custom-suggestion-marker',
         html: `
           <div style="
-          margin-top: 18px;
-            width: 32px;
-            height: 32px;
-            background-color: #3B82F6;
-            border-radius: 50%;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
+            position: relative;
+            width: 36px;
+            height: 36px;
           ">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash">
-              <path d="M3 6h18"></path>
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-            </svg>
+            <div style="
+              margin-top: 22px;
+              width: 30px;
+              height: 30px;
+              background-color: #3B82F6;
+              border-radius: 50%;
+              box-shadow: 0 1px 8px rgba(0,0,0,0.2);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-size: 20px;
+              border: 2px solid white;
+              position: relative;
+            ">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus">
+                <path d="M12 5v14M5 12h14"></path>
+              </svg>
+            </div>
           </div>
         `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 34]
+        iconSize: [36, 36],
+        iconAnchor: [18, 36]
       });
-    }    // Regular bin icon
+    }// Regular bin icon
     return L.divIcon({
       className: 'custom-bin-marker',
       html: `
@@ -421,16 +425,6 @@ const BinMap: React.FC<BinMapProps> = ({
             ${(bin as ExtendedBin).reason ? `<p style="margin: 5px 0"><strong>Reason:</strong> ${(bin as ExtendedBin).reason}</p>` : ''}
           </div>
         `);
-        
-        // Add a circle to highlight the suggested bin area
-        if (mapRef.current) {
-          L.circle([bin.location.coordinates[1], bin.location.coordinates[0]], {
-            color: '#3B82F6',
-            fillColor: '#93C5FD',
-            fillOpacity: 0.2,
-            radius: 100 // 100m radius
-          }).addTo(mapRef.current);
-        }
       }
       
       // Add interactions (click, double click) for all bins including suggestions
