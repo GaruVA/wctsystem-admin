@@ -44,7 +44,7 @@ interface AnalyticsData {
 
 interface Issue {
   _id: string;
-  bin: { name: string };
+  bin: { _id: string };
   issueType: string;
   description?: string;
   createdAt: string;
@@ -634,7 +634,7 @@ export default function DashboardPage() {
                             {issue.description || "No description provided"}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">
-                            <strong>Bin:</strong> {issue.bin?.name || "Unknown"} |{" "}
+                            <strong>Bin:</strong> {issue.bin?._id || "Unknown"} |{" "}
                             <strong>Reported At:</strong>{" "}
                             {new Date(issue.createdAt).toLocaleString()}
                           </p>
