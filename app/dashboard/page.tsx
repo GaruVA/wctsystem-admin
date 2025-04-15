@@ -1,3 +1,4 @@
+// filepath: c:\Users\0002288\Desktop\wct\admin\app\dashboard\page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -410,94 +411,43 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-          >
-            Export
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              fetchAnalytics();
-              fetchAreas();
-              fetchAlerts();
-            }}
-            disabled={loading || areasLoading}
-          >
-            {(loading || areasLoading) ? (
-              <RefreshCcw size={16} className="animate-spin mr-2" />
-            ) : (
-              <RefreshCcw size={16} className="mr-2" />
-            )}
-            Refresh Data
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Bins</CardTitle>
-              <Trash2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overallStats.totalBins}</div>
-              <p className="text-xs text-muted-foreground">Across all collection areas</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg. Utilization</CardTitle>
-              <Percent className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold flex items-center gap-1">
-                {overallStats.avgUtilization.toFixed(1)}%
-                <ArrowUpRight className={`h-4 w-4 ${getStatusColor(overallStats.avgUtilization)}`} />
-              </div>
-              <p className="text-xs text-muted-foreground">+2.5% from last week</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Collection Efficiency</CardTitle>
-              <Truck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold flex items-center gap-1">
-                {overallStats.avgEfficiency.toFixed(1)}%
-              </div>
-              <div className="mt-1 h-2 w-full rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-green-500" style={{ width: `${overallStats.avgEfficiency}%` }} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Critical Bins</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-500">{overallStats.criticalBins}</div>
-              <p className="text-xs text-muted-foreground">Bins above 80% fill level</p>
-            </CardContent>
-          </Card>
+    <div className="flex flex-col">
+      {/* Full-height hero section - 100vh */}
+      <section className="flex flex-col h-screen px-2 pt-2">
+        {/* Fixed-height header section */}
+        <div className="flex items-center justify-between p-4 md:p-6">
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+            >
+              Export
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                fetchAnalytics();
+                fetchAreas();
+                fetchAlerts();
+              }}
+              disabled={loading || areasLoading}
+            >
+              {(loading || areasLoading) ? (
+                <RefreshCcw size={16} className="animate-spin mr-2" />
+              ) : (
+                <RefreshCcw size={16} className="mr-2" />
+              )}
+              Refresh Data
+            </Button>
+          </div>
         </div>
 
-        {/* Map and Alerts */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="col-span-3 md:col-span-2">
-            <CardHeader>
+        {/* Map and Alerts container - fills remaining height */}
+        <div className="flex-1 grid gap-4 px-4 pb-4 md:px-6 md:pb-6 md:grid-cols-3">
+          {/* Map card - takes 2/3 width on md+ screens */}
+          <Card className="col-span-3 md:col-span-2 flex flex-col">
+            <CardHeader className="flex-shrink-0">
               <CardTitle className="flex items-center gap-2">
                 <Map size={18} />
                 Waste Collection Areas
@@ -510,8 +460,8 @@ export default function DashboardPage() {
               <CardDescription>
                 Collection areas with bin locations and boundaries
               </CardDescription>
-                          </CardHeader>
-            <CardContent className="p-0 h-[438px]">
+            </CardHeader>
+            <CardContent className="p-0 flex-1 min-h-0">
               {areasLoading && (
                 <div className="flex justify-center items-center h-full">
                   <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
@@ -525,14 +475,14 @@ export default function DashboardPage() {
               )}
 
               {!areasLoading && !areasError && (
-                <>
-                  <div className="mb-4 flex flex-wrap gap-2 px-6">
+                <div className="flex flex-col h-full">
+                  <div className="mb-4 flex flex-wrap gap-2 px-6 pt-2">
                     <button
                       onClick={() => setSelectedArea(null)}
                       className={`px-3 py-1 text-sm rounded ${selectedArea === null
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                        }`}
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300'
+                      }`}
                     >
                       All Areas ({areas.length})
                     </button>
@@ -542,31 +492,33 @@ export default function DashboardPage() {
                         key={area.areaID}
                         onClick={() => setSelectedArea(area.areaID)}
                         className={`px-3 py-1 text-sm rounded ${selectedArea === area.areaID
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 hover:bg-gray-300'
-                          }`}
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
                       >
                         {area.areaName} ({area.bins.length})
                       </button>
                     ))}
                   </div>
                   
-                  <BinMap
-                    areas={filteredAreas}
-                    suggestionBins={suggestionBins}
-                    fitToAreas={!selectedSuggestion}
-                    onBinSelect={handleBinSelect}
-                    selectedBin={selectedBin}
-                    style={{ height: "430px" }}
-                  />
-                </>
+                  <div className="flex-1 min-h-0">
+                    <BinMap
+                      areas={filteredAreas}
+                      suggestionBins={suggestionBins}
+                      fitToAreas={!selectedSuggestion}
+                      onBinSelect={handleBinSelect}
+                      selectedBin={selectedBin}
+                      style={{ height: "100%" }}
+                    />
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Real-time alerts container */}
-          <Card className="col-span-3 md:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between">
+          {/* Real-time alerts container - takes 1/3 width on md+ screens */}
+          <Card className="col-span-3 md:col-span-1 flex flex-col">
+            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <AlertCircle size={18} className="text-amber-500" />
@@ -586,7 +538,7 @@ export default function DashboardPage() {
                 </Button>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 overflow-auto">
               <div className="space-y-4">
                 {alerts.length === 0 ? (
                   <div className="text-center py-4">
@@ -635,158 +587,162 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
-
         </div>
-
-        {/* Issues and Bin Suggestions Grid */}
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Issues Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle size={20} className="text-red-500" />
-                Reported Issues
-              </CardTitle>
-              <CardDescription>
-                A detailed list of reported issues in the system.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {issuesLoading ? (
-                <div className="flex justify-center items-center py-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                  <span className="ml-2 text-sm text-muted-foreground">Loading issues...</span>
-                </div>
-              ) : issues.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground">No issues reported.</p>
-                </div>
-              ) : (
-                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                  {issues.map((issue) => (
-                    <div
-                      key={issue._id}
-                      className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
-                        <AlertTriangle size={20} />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-sm font-medium text-gray-800">
-                          {issue.issueType}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          {issue.description || "No description provided"}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          <strong>Bin:</strong> {issue.bin?.name || "Unknown"} |{" "}
-                          <strong>Reported At:</strong>{" "}
-                          {new Date(issue.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Bin Location Suggestions Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Map size={20} className="text-blue-500" />
-                Bin Location Suggestions
-              </CardTitle>
-              <CardDescription>
-                Suggested locations for new waste bins based on community feedback.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {suggestionsLoading ? (
-                <div className="flex justify-center items-center py-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                  <span className="ml-2 text-sm text-muted-foreground">Loading suggestions...</span>
-                </div>
-              ) : binSuggestions.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground">No bin location suggestions available.</p>
-                </div>
-              ) : (
-                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                  {binSuggestions.map((suggestion) => (
-                    <div
-                      key={suggestion._id}
-                      className={`flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow ${selectedSuggestion?._id === suggestion._id ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
-                    >
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-500">
-                        <Map size={20} />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-sm font-medium text-gray-800">
-                          {suggestion.address ? (
-                            <>{suggestion.address}</>
-                          ) : (
-                            <>Location: {suggestion.location.latitude.toFixed(6)}, {suggestion.location.longitude.toFixed(6)}</>
-                          )}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          {suggestion.reason}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          <strong>Coordinates:</strong> {suggestion.location.latitude.toFixed(4)}, {suggestion.location.longitude.toFixed(4)} |{" "}
-                          <strong>Suggested:</strong>{" "}
-                          {formatRelativeTime(suggestion.createdAt)}
-                        </p>
-                        <div className="mt-2 flex gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="h-7 text-xs"
-                            onClick={() => {
-                              // Find the suggestion bin in the formatted bins
-                              const binToView = suggestionBins.find(bin => bin._id === suggestion._id);
-                              
-                              // First select the suggestion to highlight it on the map
-                              setSelectedBin(binToView || null);
-                              
-                              // Then set the selectedSuggestion to allow the map to zoom to it
-                              setSelectedSuggestion(suggestion);
-                            }}
-                          >
-                            View on Map
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="default" 
-                            className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                          >
-                            Approve
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="destructive" 
-                            className="h-7 text-xs"
-                            onClick={() => {
-                              // If this suggestion is currently selected, deselect it first
-                              if (selectedSuggestion?._id === suggestion._id) {
-                                setSelectedSuggestion(null);
-                              }
-                              handleRejectSuggestion(suggestion._id);
-                            }}
-                          >
-                            Reject
-                          </Button>
+      </section>
+      
+      {/* Issues and Bin Suggestions - Below the hero section */}
+      <section className="px-8 pb-8">
+        <div className="space-y-6">
+          {/* Issues and Bin Suggestions Grid */}
+          <div className="grid gap-4 md:grid-cols-1">
+            {/* Issues Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle size={20} className="text-red-500" />
+                  Reported Issues
+                </CardTitle>
+                <CardDescription>
+                  A detailed list of reported issues in the system.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {issuesLoading ? (
+                  <div className="flex justify-center items-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                    <span className="ml-2 text-sm text-muted-foreground">Loading issues...</span>
+                  </div>
+                ) : issues.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">No issues reported.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                    {issues.map((issue) => (
+                      <div
+                        key={issue._id}
+                        className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
+                          <AlertTriangle size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-sm font-medium text-gray-800">
+                            {issue.issueType}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            {issue.description || "No description provided"}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            <strong>Bin:</strong> {issue.bin?.name || "Unknown"} |{" "}
+                            <strong>Reported At:</strong>{" "}
+                            {new Date(issue.createdAt).toLocaleString()}
+                          </p>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Bin Location Suggestions Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Map size={20} className="text-blue-500" />
+                  Bin Location Suggestions
+                </CardTitle>
+                <CardDescription>
+                  Suggested locations for new waste bins based on community feedback.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {suggestionsLoading ? (
+                  <div className="flex justify-center items-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                    <span className="ml-2 text-sm text-muted-foreground">Loading suggestions...</span>
+                  </div>
+                ) : binSuggestions.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">No bin location suggestions available.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                    {binSuggestions.map((suggestion) => (
+                      <div
+                        key={suggestion._id}
+                        className={`flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow ${selectedSuggestion?._id === suggestion._id ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+                      >
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-500">
+                          <Map size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-sm font-medium text-gray-800">
+                            {suggestion.address ? (
+                              <>{suggestion.address}</>
+                            ) : (
+                              <>Location: {suggestion.location.latitude.toFixed(6)}, {suggestion.location.longitude.toFixed(6)}</>
+                            )}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            {suggestion.reason}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            <strong>Coordinates:</strong> {suggestion.location.latitude.toFixed(4)}, {suggestion.location.longitude.toFixed(4)} |{" "}
+                            <strong>Suggested:</strong>{" "}
+                            {formatRelativeTime(suggestion.createdAt)}
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={() => {
+                                // Find the suggestion bin in the formatted bins
+                                const binToView = suggestionBins.find(bin => bin._id === suggestion._id);
+                                
+                                // First select the suggestion to highlight it on the map
+                                setSelectedBin(binToView || null);
+                                
+                                // Then set the selectedSuggestion to allow the map to zoom to it
+                                setSelectedSuggestion(suggestion);
+                              }}
+                            >
+                              View on Map
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="default" 
+                              className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                            >
+                              Approve
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="destructive" 
+                              className="h-7 text-xs"
+                              onClick={() => {
+                                // If this suggestion is currently selected, deselect it first
+                                if (selectedSuggestion?._id === suggestion._id) {
+                                  setSelectedSuggestion(null);
+                                }
+                                handleRejectSuggestion(suggestion._id);
+                              }}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
