@@ -526,9 +526,7 @@ export default function DashboardPage() {
                   </div>
                 )}
               </CardContent>
-            </Card>
-
-            {/* Bin Location Suggestions Section */}
+            </Card>            {/* Bin Location Suggestions Summary */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -536,7 +534,7 @@ export default function DashboardPage() {
                   Bin Location Suggestions
                 </CardTitle>
                 <CardDescription>
-                  Suggested locations for new waste bins based on community feedback.
+                  Quick summary of bin suggestions. Manage suggestions in the Bins page.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -550,74 +548,71 @@ export default function DashboardPage() {
                     <p className="text-sm text-muted-foreground">No bin location suggestions available.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                    {binSuggestions.map((suggestion) => (
+                  <div>
+                    <div className="flex justify-between items-center mb-4">
+                      <p className="text-sm font-medium">{binSuggestions.length} suggestions available</p>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => window.location.href = "/dashboard/bins"}
+                      >
+                        Manage All Suggestions
+                      </Button>
+                    </div>
+                    
+                    {/* Map showing suggestion locations */}
+                    <div className="mb-4 h-[200px] rounded-md overflow-hidden border">
+                      <BinMap
+                        suggestionBins={suggestionBins}
+                        style={{ height: "100%" }}
+                        fitToAreas={false}
+                      />
+                    </div>
+                    
+                    {/* Show just a few recent suggestions */}
+                    {binSuggestions.slice(0, 2).map((suggestion) => (
                       <div
                         key={suggestion._id}
-                        className={`flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow ${selectedSuggestion?._id === suggestion._id ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+                        className="flex items-start gap-3 p-3 border rounded-md shadow-sm bg-white mb-2"
                       >
-                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-500">
-                          <Map size={20} />
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-500">
+                          <Map size={16} />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-sm font-medium text-gray-800">
-                            {suggestion.address ? (
-                              <>{suggestion.address}</>
-                            ) : (
-                              <>Location: {suggestion.location.latitude.toFixed(6)}, {suggestion.location.longitude.toFixed(6)}</>
-                            )}
+                          <h3 className="text-xs font-medium text-gray-800 truncate">
+                            {suggestion.address || `Location: ${suggestion.location.latitude.toFixed(6)}, ${suggestion.location.longitude.toFixed(6)}`}
                           </h3>
-                          <p className="text-xs text-muted-foreground">
-                            {suggestion.reason}
+                          <p className="text-xs text-gray-500">
+                            <strong>Suggested:</strong> {formatRelativeTime(suggestion.createdAt)}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            <strong>Coordinates:</strong> {suggestion.location.latitude.toFixed(4)}, {suggestion.location.longitude.toFixed(4)} |{" "}
-                            <strong>Suggested:</strong>{" "}
-                            {formatRelativeTime(suggestion.createdAt)}
-                          </p>
-                          <div className="mt-2 flex gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              className="h-7 text-xs"
-                              onClick={() => {
-                                // Find the suggestion bin in the formatted bins
-                                const binToView = suggestionBins.find(bin => bin._id === suggestion._id);
-                                
-                                // First select the suggestion to highlight it on the map
-                                setSelectedBin(binToView || null);
-                                
-                                // Then set the selectedSuggestion to allow the map to zoom to it
-                                setSelectedSuggestion(suggestion);
-                              }}
-                            >
-                              View on Map
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="default" 
-                              className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                            >
-                              Approve
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="destructive" 
-                              className="h-7 text-xs"
-                              onClick={() => {
-                                // If this suggestion is currently selected, deselect it first
-                                if (selectedSuggestion?._id === suggestion._id) {
-                                  setSelectedSuggestion(null);
-                                }
-                                handleRejectSuggestion(suggestion._id);
-                              }}
-                            >
-                              Reject
-                            </Button>
-                          </div>
                         </div>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            // Find the suggestion bin in the formatted bins
+                            const binToView = suggestionBins.find(bin => bin._id === suggestion._id);
+                            setSelectedBin(binToView || null);
+                            setSelectedSuggestion(suggestion);
+                          }}
+                        >
+                          View
+                        </Button>
                       </div>
                     ))}
+                    
+                    {binSuggestions.length > 2 && (
+                      <div className="text-center mt-2">
+                        <Button 
+                          variant="link" 
+                          size="sm"
+                          onClick={() => window.location.href = "/dashboard/bins"}
+                        >
+                          View all {binSuggestions.length} suggestions
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
