@@ -35,6 +35,11 @@ export default function Sidebar({ className }: SidebarProps) {
       icon: Map,
     },
     {
+      name: "Bins",
+      path: "/dashboard/bins",
+      icon: Trash2,
+    },
+    {
       name: "Routes",
       path: "/dashboard/routes",
       icon: Route,

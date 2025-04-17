@@ -50,6 +50,7 @@ import {
   Settings,
 } from "lucide-react";
 import BinMap from "@/components/dashboard/bin-map";
+import RouteMap from "@/components/dashboard/route-map";
 import { 
   getAllAreasWithBins,
   AreaWithBins,
@@ -880,16 +881,14 @@ export default function SchedulePage() {
                   {/* Map View Tab */}
                   <TabsContent value="map" className="m-0">
                     <div className="h-[500px] rounded-md overflow-hidden">
-                      <BinMap
-                        bins={currentRoute.bins}
-                        optimizedRoute={currentRoute.routePolyline || currentRoute.bins.map(bin => 
-                          [bin.location.coordinates[0], bin.location.coordinates[1]] as [number, number]
-                        )}
+                      <RouteMap
+                        routeBins={currentRoute.bins}
+                        routePolyline={currentRoute.routePolyline}
+                        area={areas.find(area => area.areaID === selectedArea)}
                         onBinSelect={handleBinSelect}
                         selectedBin={selectedBin}
                         style={{ height: "500px" }}
-                        singleArea={areas.find(area => area.areaID === selectedArea)}
-                        fitToRoute={true}
+                        showSequenceNumbers={true}
                       />
                     </div>
                   </TabsContent>

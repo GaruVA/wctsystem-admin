@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import BinMap from "@/components/dashboard/bin-map";
+import SuggestionBinMap from "@/components/dashboard/suggestion-bin-map";
 import {
   RefreshCcw,
   Trash2,
@@ -385,7 +386,6 @@ export default function DashboardPage() {
                     <div className="flex-1 min-h-0">
                     <BinMap
                       areas={filteredAreas}
-                      suggestionBins={suggestionBins}
                       fitToAreas={!selectedSuggestion}
                       onBinSelect={handleBinSelect}
                       selectedBin={selectedBin}
@@ -503,7 +503,7 @@ export default function DashboardPage() {
                     {issues.map((issue) => (
                       <div
                         key={issue._id}
-                        className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow"
+                        className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white"
                       >
                         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
                           <AlertTriangle size={20} />
@@ -526,102 +526,7 @@ export default function DashboardPage() {
                   </div>
                 )}
               </CardContent>
-            </Card>
-
-            {/* Bin Location Suggestions Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Map size={20} className="text-blue-500" />
-                  Bin Location Suggestions
-                </CardTitle>
-                <CardDescription>
-                  Suggested locations for new waste bins based on community feedback.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {suggestionsLoading ? (
-                  <div className="flex justify-center items-center py-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                    <span className="ml-2 text-sm text-muted-foreground">Loading suggestions...</span>
-                  </div>
-                ) : binSuggestions.length === 0 ? (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-muted-foreground">No bin location suggestions available.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                    {binSuggestions.map((suggestion) => (
-                      <div
-                        key={suggestion._id}
-                        className={`flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow ${selectedSuggestion?._id === suggestion._id ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
-                      >
-                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-500">
-                          <Map size={20} />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-sm font-medium text-gray-800">
-                            {suggestion.address ? (
-                              <>{suggestion.address}</>
-                            ) : (
-                              <>Location: {suggestion.location.latitude.toFixed(6)}, {suggestion.location.longitude.toFixed(6)}</>
-                            )}
-                          </h3>
-                          <p className="text-xs text-muted-foreground">
-                            {suggestion.reason}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            <strong>Coordinates:</strong> {suggestion.location.latitude.toFixed(4)}, {suggestion.location.longitude.toFixed(4)} |{" "}
-                            <strong>Suggested:</strong>{" "}
-                            {formatRelativeTime(suggestion.createdAt)}
-                          </p>
-                          <div className="mt-2 flex gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              className="h-7 text-xs"
-                              onClick={() => {
-                                // Find the suggestion bin in the formatted bins
-                                const binToView = suggestionBins.find(bin => bin._id === suggestion._id);
-                                
-                                // First select the suggestion to highlight it on the map
-                                setSelectedBin(binToView || null);
-                                
-                                // Then set the selectedSuggestion to allow the map to zoom to it
-                                setSelectedSuggestion(suggestion);
-                              }}
-                            >
-                              View on Map
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="default" 
-                              className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                            >
-                              Approve
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="destructive" 
-                              className="h-7 text-xs"
-                              onClick={() => {
-                                // If this suggestion is currently selected, deselect it first
-                                if (selectedSuggestion?._id === suggestion._id) {
-                                  setSelectedSuggestion(null);
-                                }
-                                handleRejectSuggestion(suggestion._id);
-                              }}
-                            >
-                              Reject
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            </Card>          
           </div>
         </div>
       </section>

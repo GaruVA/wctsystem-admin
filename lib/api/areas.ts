@@ -13,6 +13,9 @@ export interface Bin {
   lastCollected: string;
   address?: string;
   wasteType: string; // Added wasteType property
+  status?: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE' | 'PENDING_INSTALLATION';
+  isSuggestion?: boolean;
+  reason?: string;
 }
 
 // Interface for area data with bins

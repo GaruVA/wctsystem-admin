@@ -50,6 +50,7 @@ import {
 import { format, addDays, subDays, isSameDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import BinMap from "@/components/dashboard/bin-map";
+import RouteMap from "@/components/dashboard/route-map";
 import { getAllAreasWithBins, AreaWithBins } from "@/lib/api/areas"; 
 import { 
   getAllSchedules, 
@@ -325,14 +326,14 @@ const ScheduleDetailsDialog = ({
                   <TabsContent value="route" className="mt-0">
                     <div className="h-[500px] rounded-md overflow-hidden">
                       {detailedSchedule.route && detailedSchedule.route.length > 0 ? (
-                        <BinMap 
-                          optimizedRoute={detailedSchedule.route}
-                          bins={Array.isArray(detailedSchedule.binSequence) 
+                        <RouteMap 
+                          routeBins={Array.isArray(detailedSchedule.binSequence) 
                             ? detailedSchedule.binSequence
                                 .filter((bin): bin is any => typeof bin === 'object' && bin !== null && '_id' in bin)
                             : []}
+                          routePolyline={detailedSchedule.route}
                           style={{ height: "500px", width: "100%" }}
-                          fitToRoute={true}
+                          showSequenceNumbers={true}
                         />
                       ) : (
                         <div className="h-full flex items-center justify-center bg-muted/50">
