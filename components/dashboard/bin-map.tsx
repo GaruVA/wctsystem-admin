@@ -33,6 +33,7 @@ interface BinMapProps {
 interface ExtendedBin extends Bin {
   isSuggestion?: boolean;
   reason?: string;
+  status?: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE' | 'PENDING_INSTALLATION';
 }
 
 const BinMap: React.FC<BinMapProps> = ({
@@ -87,7 +88,8 @@ const BinMap: React.FC<BinMapProps> = ({
     areaId?: string, 
     isSuggestion?: boolean,
     binId?: string,
-    hasIssue?: boolean
+    hasIssue?: boolean,
+    status?: string
   ) => {
     // Fill level colors (primary color indicator)
     const getFillLevelColor = (level: number) => {
@@ -97,42 +99,81 @@ const BinMap: React.FC<BinMapProps> = ({
       return '#10B981'; // Green
     };
 
-    // For suggestion bins, use a special blue color
-    const fillLevelColor = isSuggestion ? '#3B82F6' : getFillLevelColor(fillLevel);    // For suggestion bins, use a different icon style
-    if (isSuggestion) {
-      return L.divIcon({
-        className: 'custom-suggestion-marker',
-        html: `
-          <div style="
-            position: relative;
-            width: 36px;
-            height: 36px;
-          ">
-            <div style="
-              margin-top: 22px;
-              width: 30px;
-              height: 30px;
-              background-color: #3B82F6;
-              border-radius: 50%;
-              box-shadow: 0 1px 8px rgba(0,0,0,0.2);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: white;
-              font-size: 20px;
-              border: 2px solid white;
-              position: relative;
-            ">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus">
-                <path d="M12 5v14M5 12h14"></path>
-              </svg>
-            </div>
-          </div>
-        `,
-        iconSize: [36, 36],
-        iconAnchor: [18, 36]
-      });
-    }// Regular bin icon
+    // Get status indicator color and style
+    const getStatusIndicator = (status?: string) => {
+      switch(status) {
+        case 'MAINTENANCE':
+          return `<div style="
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 16px;
+            height: 16px;
+            background-color: #F59E0B;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+          ">M</div>`;
+        case 'INACTIVE':
+          return `<div style="
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 16px;
+            height: 16px;
+            background-color: #6B7280;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+          ">I</div>`;
+        case 'PENDING_INSTALLATION':
+          return `<div style="
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 16px;
+            height: 16px;
+            background-color: #8B5CF6;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+          ">P</div>`;
+        default:
+          return ''; // ACTIVE status - no indicator needed
+      }
+    };
+
+    // Get fill level color based on status
+    const getBinColor = (fillLevel: number, status?: string) => {
+      // For inactive bins, always gray
+      if (status === 'INACTIVE') return '#6B7280';
+      // For pending installation, always purple
+      if (status === 'PENDING_INSTALLATION') return '#8B5CF6';
+      // For other statuses, use the fill level color
+      return getFillLevelColor(fillLevel);
+    };
+
+    const fillLevelColor = getBinColor(fillLevel, status);
+
+    // Regular bin icon
     return L.divIcon({
       className: 'custom-bin-marker',
       html: `
@@ -141,23 +182,7 @@ const BinMap: React.FC<BinMapProps> = ({
           width: 24px; 
           height: 28px;
         ">
-          ${hasIssue ? `<div style="
-            position: absolute;
-            top: -10px;
-            right: -8px;
-            width: 18px;
-            height: 18px;
-            background-color: #EF4444;
-            border-radius: 50%;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            z-index: 2;
-          ">!</div>` : ''}
+          ${getStatusIndicator(status)}
           <div style="
           margin-top: 3px;
             width: 24px;
@@ -172,6 +197,7 @@ const BinMap: React.FC<BinMapProps> = ({
             font-weight: bold;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             position: relative;
+            ${status === 'INACTIVE' ? 'opacity: 0.7;' : ''}
           ">
             ${fillLevel}%
           </div>
@@ -234,10 +260,24 @@ const BinMap: React.FC<BinMapProps> = ({
             <span>≥ 90% - Critical</span>
           </div>
           
-          <div style="font-weight: bold; margin-bottom: 5px;">Bin Types</div>
+          <div style="font-weight: bold; margin-bottom: 5px;">Bin Status</div>
           <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 15px; height: 15px; background-color: #3B82F6; border-radius: 50%; margin-right: 5px;"></div>
-            <span>Suggested Bin</span>
+            <div style="position: relative; width: 15px; height: 15px; margin-right: 5px;">
+              <div style="width: 10px; height: 10px; background-color: #F59E0B; border-radius: 50%; font-size: 8px; color: white; text-align: center; line-height: 10px; font-weight: bold;">M</div>
+            </div>
+            <span>Maintenance</span>
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="position: relative; width: 15px; height: 15px; margin-right: 5px;">
+              <div style="width: 10px; height: 10px; background-color: #6B7280; border-radius: 50%; font-size: 8px; color: white; text-align: center; line-height: 10px; font-weight: bold;">I</div>
+            </div>
+            <span>Inactive</span>
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 10px;">
+            <div style="position: relative; width: 15px; height: 15px; margin-right: 5px;">
+              <div style="width: 10px; height: 10px; background-color: #8B5CF6; border-radius: 50%; font-size: 8px; color: white; text-align: center; line-height: 10px; font-weight: bold;">P</div>
+            </div>
+            <span>Pending Installation</span>
           </div>
           
           <div style="font-weight: bold; margin-bottom: 5px; margin-top: 10px;">Waste Types</div>
@@ -410,7 +450,8 @@ const BinMap: React.FC<BinMapProps> = ({
             areaId, 
             isSuggestion,
             bin._id,
-            hasIssue
+            hasIssue,
+            bin.status
           ) 
         }
       );

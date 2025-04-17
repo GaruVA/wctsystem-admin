@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { 
   Card, 
@@ -15,8 +15,7 @@ import {
   DialogHeader, 
   DialogTitle, 
   DialogDescription,
-  DialogFooter,
-  DialogClose
+  DialogFooter
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +34,6 @@ import {
   Edit, 
   Plus, 
   Map, 
-  Filter, 
   RefreshCcw,
   Check,
   X
@@ -44,6 +42,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
 import BinMap from "@/components/dashboard/bin-map";
+import SuggestionBinMap from "@/components/dashboard/suggestion-bin-map";
 import { getAllAreasWithBins, AreaWithBins } from "@/lib/api/areas";
 
 interface Bin {
@@ -57,6 +56,7 @@ interface Bin {
   wasteType: string;
   address?: string;
   area?: string;
+  status?: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE' | 'PENDING_INSTALLATION';
 }
 
 interface BinSuggestion {
@@ -182,6 +182,14 @@ export default function BinManagementPage() {
   const [areasLoading, setAreasLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Pagination and filtering states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [filterWasteType, setFilterWasteType] = useState<string>("");
+  const [filterFillLevel, setFilterFillLevel] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
+  const itemsPerPage = 5;
+  
   // State for CRUD operations
   const [createDialogOpen, setCreateDialogOpen] = useState<boolean>(false);
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
@@ -195,17 +203,19 @@ export default function BinManagementPage() {
   const [newBinWasteType, setNewBinWasteType] = useState<string>("GENERAL");
   const [newBinLocation, setNewBinLocation] = useState<[number, number] | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<string>("");
+  const [newBinStatus, setNewBinStatus] = useState<string>("ACTIVE");
   
   // For edit dialog
   const [editWasteType, setEditWasteType] = useState<string>("");
   const [editAreaId, setEditAreaId] = useState<string>("");
+  const [editStatus, setEditStatus] = useState<string>("");
 
   // Fetch all data on component mount
   useEffect(() => {
     fetchBins();
     fetchBinSuggestions();
     fetchAreas();
-  }, []);
+  }, []); 
   // Fetch bins from API
   const fetchBins = async () => {
     try {
@@ -280,7 +290,8 @@ export default function BinManagementPage() {
             coordinates: newBinLocation
           },
           wasteType: newBinWasteType,
-          area: selectedAreaId || undefined
+          status: newBinStatus,
+          area: selectedAreaId === "_none" ? undefined : selectedAreaId || undefined
         },
         {
           headers: {
@@ -297,6 +308,7 @@ export default function BinManagementPage() {
       // Reset form and refresh data
       setNewBinLocation(null);
       setNewBinWasteType("GENERAL");
+      setNewBinStatus("ACTIVE");
       setSelectedAreaId("");
       setCreateDialogOpen(false);
       fetchBins();
@@ -390,6 +402,27 @@ export default function BinManagementPage() {
     return "bg-green-500";
   };
 
+  // Format bin status for display
+  const formatBinStatus = (status: string) => {
+    return status.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  };
+  
+  // Get color for bin status badge
+  const getBinStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return "bg-green-100 text-green-800 hover:bg-green-200";
+      case 'MAINTENANCE':
+        return "bg-amber-100 text-amber-800 hover:bg-amber-200";
+      case 'INACTIVE':
+        return "bg-red-100 text-red-800 hover:bg-red-200";
+      case 'PENDING_INSTALLATION':
+        return "bg-blue-100 text-blue-800 hover:bg-blue-200";
+      default:
+        return "bg-gray-100 text-gray-800 hover:bg-gray-200";
+    }
+  };
+
   // Format date for display
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return "N/A";
@@ -418,7 +451,11 @@ export default function BinManagementPage() {
       }
       
       if (editAreaId) {
-        updates.area = editAreaId;
+        updates.area = editAreaId === "_none" ? null : editAreaId;
+      }
+      
+      if (editStatus) {
+        updates.status = editStatus;
       }
       
       await axios.post(
@@ -480,10 +517,52 @@ export default function BinManagementPage() {
     }
   };
 
+  // Handle filtering and pagination
+  const filteredBins = bins.filter((bin) => {
+    // Filter by search term (check ID and address)
+    const searchMatch = !searchTerm || 
+      bin._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (bin.address && bin.address.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // Filter by waste type
+    const wasteTypeMatch = !filterWasteType || filterWasteType === "all_types" || bin.wasteType === filterWasteType;
+    
+    // Filter by fill level
+    let fillLevelMatch = true;
+    if (filterFillLevel === "high") {
+      fillLevelMatch = bin.fillLevel >= 70;
+    } else if (filterFillLevel === "medium") {
+      fillLevelMatch = bin.fillLevel >= 30 && bin.fillLevel < 70;
+    } else if (filterFillLevel === "low") {
+      fillLevelMatch = bin.fillLevel < 30;
+    }
+    // "all_levels" will keep fillLevelMatch as true
+    
+    // Filter by status
+    const statusMatch = !filterStatus || filterStatus === "all_statuses" || bin.status === filterStatus;
+
+    return searchMatch && wasteTypeMatch && fillLevelMatch && statusMatch;
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredBins.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedBins = filteredBins.slice(startIndex, startIndex + itemsPerPage);
+  
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterWasteType, filterFillLevel, filterStatus]);
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Bins</h1>
+    <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Bins</h1>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -498,8 +577,8 @@ export default function BinManagementPage() {
             Refresh
           </Button>
           <Button
+            size="sm"
             onClick={() => setCreateDialogOpen(true)}
-            className="flex items-center"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add New Bin
@@ -508,7 +587,7 @@ export default function BinManagementPage() {
       </div>
 
       {/* Bins List Section */}
-      <Card className="mb-8">
+      <Card className="mb-4">
         <CardHeader>
           <CardTitle>Bin List</CardTitle>
           <CardDescription>
@@ -530,59 +609,270 @@ export default function BinManagementPage() {
               <p>No waste bins found. Create new bins using the "Add New Bin" button.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Waste Type</TableHead>
-                    <TableHead>Fill Level</TableHead>
-                    <TableHead>Last Collected</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bins.map((bin) => (
-                    <TableRow key={bin._id}>
-                      <TableCell className="font-medium">{bin._id}</TableCell>
-                      <TableCell>
-                        {bin.address || `${bin.location.coordinates[1].toFixed(6)}, ${bin.location.coordinates[0].toFixed(6)}`}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {bin.wasteType.toLowerCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${getFillLevelColor(bin.fillLevel)}`}></div>
-                          <span>{bin.fillLevel}%</span>
-                        </div>
-                        <Progress value={bin.fillLevel} className="h-1 mt-1" />
-                      </TableCell>
-                      <TableCell>{formatDate(bin.lastCollected)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => {
-                            setCurrentBin(bin);
-                            setEditDialogOpen(true);
-                          }}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => {
-                            setCurrentBin(bin);
-                            setDeleteDialogOpen(true);
-                          }}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+            <>
+              {/* Filter controls */}
+              <div className="flex flex-wrap gap-4 mb-6">
+                <div className="flex-1 min-w-[200px]">
+                  <Label htmlFor="search" className="mb-2 block text-sm">
+                    Search
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="search"
+                      placeholder="Search by ID or address"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-8"
+                    />
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 absolute left-2.5 top-3 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="w-[200px]">
+                  <Label htmlFor="waste-type-filter" className="mb-2 block text-sm">
+                    Waste Type
+                  </Label>
+                  <Select
+                    value={filterWasteType}
+                    onValueChange={setFilterWasteType}
+                  >
+                    <SelectTrigger id="waste-type-filter">
+                      <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all_types">All Types</SelectItem>
+                      <SelectItem value="GENERAL">General</SelectItem>
+                      <SelectItem value="ORGANIC">Organic</SelectItem>
+                      <SelectItem value="RECYCLE">Recyclable</SelectItem>
+                      <SelectItem value="HAZARDOUS">Hazardous</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="w-[200px]">
+                  <Label htmlFor="status-filter" className="mb-2 block text-sm">
+                    Status
+                  </Label>
+                  <Select
+                    value={filterStatus}
+                    onValueChange={setFilterStatus}
+                  >
+                    <SelectTrigger id="status-filter">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all_statuses">All Statuses</SelectItem>
+                      <SelectItem value="ACTIVE">Active</SelectItem>
+                      <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                      <SelectItem value="INACTIVE">Inactive</SelectItem>
+                      <SelectItem value="PENDING_INSTALLATION">Pending Installation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="w-[200px]">
+                  <Label htmlFor="fill-level-filter" className="mb-2 block text-sm">
+                    Fill Level
+                  </Label>
+                  <Select
+                    value={filterFillLevel}
+                    onValueChange={setFilterFillLevel}
+                  >
+                    <SelectTrigger id="fill-level-filter">
+                      <SelectValue placeholder="All Levels" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all_levels">All Levels</SelectItem>
+                      <SelectItem value="high">High (≥70%)</SelectItem>
+                      <SelectItem value="medium">Medium (30-69%)</SelectItem>
+                      <SelectItem value="low">Low (&lt;30%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {(searchTerm || filterWasteType || filterFillLevel) && (
+                  <div className="flex items-end">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setSearchTerm("");
+                        setFilterWasteType("");
+                        setFilterFillLevel("");
+                        setFilterStatus("");
+                      }}
+                      className="mb-0.5"
+                    >
+                      Clear Filters
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Results summary */}
+              <div className="flex justify-between items-center mb-4 text-sm text-muted-foreground">
+                <div>
+                  Showing {paginatedBins.length} of {filteredBins.length} bins
+                  {(filteredBins.length !== bins.length) && (
+                    <span> (filtered from {bins.length} total)</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Bins table */}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Waste Type</TableHead>
+                      <TableHead>Fill Level</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Collected</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedBins.map((bin) => (
+                      <TableRow key={bin._id}>
+                        <TableCell className="font-medium">{bin._id}</TableCell>
+                        <TableCell>
+                          {bin.address || `${bin.location.coordinates[1].toFixed(6)}, ${bin.location.coordinates[0].toFixed(6)}`}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {bin.wasteType.toLowerCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${getFillLevelColor(bin.fillLevel)}`}></div>
+                            <span>{bin.fillLevel}%</span>
+                          </div>
+                          <Progress value={bin.fillLevel} className="h-1 mt-1" />
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            className={getBinStatusColor(bin.status || 'ACTIVE')}
+                          >
+                            {formatBinStatus(bin.status || 'ACTIVE')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatDate(bin.lastCollected)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => {
+                              setCurrentBin(bin);
+                              setEditDialogOpen(true);
+                            }}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => {
+                              setCurrentBin(bin);
+                              setDeleteDialogOpen(true);
+                            }}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center mt-6">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handlePageChange(1)}
+                      disabled={currentPage === 1}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                        <path fillRule="evenodd" d="M7.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L3.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                      </svg>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M12.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L8.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                      </svg>
+                    </Button>
+                    
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      // Show only a window of pages around the current page
+                      if (
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+                      ) {
+                        return (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(page)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {page}
+                          </Button>
+                        );
+                      } else if (
+                        page === currentPage - 2 ||
+                        page === currentPage + 2
+                      ) {
+                        return <span key={page} className="px-1">...</span>;
+                      }
+                      return null;
+                    })}
+                    
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M7.293 15.707a1 1 0 010-1.414L11.586 10 7.293 5.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handlePageChange(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 15.707a1 1 0 010-1.414L8.586 10 4.293 5.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        <path fillRule="evenodd" d="M12.293 15.707a1 1 0 010-1.414L16.586 10l-4.293-4.293a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -609,60 +899,98 @@ export default function BinManagementPage() {
               <p className="text-sm text-muted-foreground">No bin location suggestions available.</p>
             </div>
           ) : (
-            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-              {binSuggestions.map((suggestion) => (
-                <div
-                  key={suggestion._id}
-                  className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-500">
-                    <Map size={20} />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-medium text-gray-800">
-                      {suggestion.address ? (
-                        <>{suggestion.address}</>
-                      ) : (
-                        <>Location: {suggestion.location.latitude.toFixed(6)}, {suggestion.location.longitude.toFixed(6)}</>
-                      )}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      {suggestion.reason}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      <strong>Coordinates:</strong> {suggestion.location.latitude.toFixed(4)}, {suggestion.location.longitude.toFixed(4)} |{" "}
-                      <strong>Suggested:</strong>{" "}
-                      {formatRelativeTime(suggestion.createdAt)}
-                    </p>
-                    <div className="mt-2 flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="h-7 text-xs"
-                        onClick={() => handleViewSuggestionOnMap(suggestion)}
-                      >
-                        View on Map
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="default" 
-                        className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                        onClick={() => handleApproveSuggestion(suggestion)}
-                      >
-                        Approve
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive" 
-                        className="h-7 text-xs"
-                        onClick={() => handleRejectSuggestion(suggestion._id)}
-                      >
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
+            <div>
+              
+              {/* Layout changed to flex with map taking 2/3 and list 1/3 */}
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Map showing all suggestion locations - now 2/3 width */}
+                <div className="md:w-2/3 h-[400px] rounded-md overflow-hidden border">
+                  <SuggestionBinMap
+                    suggestionBins={binSuggestions.map(suggestion => ({
+                      _id: suggestion._id,
+                      location: {
+                        type: "Point",
+                        coordinates: [suggestion.location.longitude, suggestion.location.latitude]
+                      },
+                      fillLevel: 0,
+                      wasteType: "GENERAL",
+                      lastCollected: new Date().toISOString(),
+                      address: suggestion.address || "",
+                      reason: suggestion.reason
+                    }))}
+                    style={{ height: "100%" }}
+                    selectedBin={currentSuggestion ? {
+                      _id: currentSuggestion._id,
+                      location: {
+                        type: "Point",
+                        coordinates: [currentSuggestion.location.longitude, currentSuggestion.location.latitude]
+                      }
+                    } as any : null}
+                    onBinSelect={(bin) => {
+                      if (bin) {
+                        const suggestion = binSuggestions.find(s => s._id === bin._id);
+                        setCurrentSuggestion(suggestion || null);
+                      } else {
+                        setCurrentSuggestion(null);
+                      }
+                    }}
+                  />
                 </div>
-              ))}
+                
+                {/* List of suggestions with improved layout - now 1/3 width */}
+                <div className="md:w-1/3 space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                  {binSuggestions.map((suggestion) => (
+                    <div
+                      key={suggestion._id}
+                      className={`flex items-start gap-3 p-3 border rounded-md shadow-sm bg-white mb-2 hover:shadow-md transition-shadow cursor-pointer ${
+                        currentSuggestion && currentSuggestion._id === suggestion._id ? 'border-blue-500 bg-blue-50' : ''
+                      }`}
+                      onClick={() => {
+                        if (currentSuggestion && currentSuggestion._id === suggestion._id) {
+                          setCurrentSuggestion(null);
+                        } else {
+                          setCurrentSuggestion(suggestion);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-500">
+                        <Map size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xs font-medium text-gray-800 truncate">
+                          {suggestion.address || `Location: ${suggestion.location.latitude.toFixed(6)}, ${suggestion.location.longitude.toFixed(6)}`}
+                        </h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                          {suggestion.reason}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          <strong>Suggested:</strong> {formatRelativeTime(suggestion.createdAt)}
+                        </p>
+                      </div>
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          onClick={() => handleApproveSuggestion(suggestion)}
+                          title="Approve suggestion"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleRejectSuggestion(suggestion._id)}
+                          title="Reject suggestion"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
@@ -698,9 +1026,29 @@ export default function BinManagementPage() {
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="status" className="text-right">
+                Status
+              </Label>
+              <Select
+                value={newBinStatus}
+                onValueChange={setNewBinStatus}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  <SelectItem value="PENDING_INSTALLATION">Pending Installation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="area" className="text-right">
                 Area
-              </Label>              <Select
+              </Label>              
+              <Select
                 value={selectedAreaId}
                 onValueChange={setSelectedAreaId}
               >
@@ -708,7 +1056,7 @@ export default function BinManagementPage() {
                   <SelectValue placeholder="Select area (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {areas.map((area) => (
                     <SelectItem key={area.areaID} value={area.areaID}>
                       {area.areaName}
@@ -762,19 +1110,24 @@ export default function BinManagementPage() {
               {currentSuggestion?.address || "Viewing the suggested bin location on the map"}
             </DialogDescription>
           </DialogHeader>
-          <div className="h-[400px] border rounded-md">
+          <div className="h-[400px] border rounded-md overflow-hidden">
             {currentSuggestion && (
               <div className="h-full">
-                {/* This would be replaced with an actual BinMap component */}
-                <div className="flex items-center justify-center h-full bg-gray-100">
-                  <div className="text-center">
-                    <p className="mb-2">Map would display here showing:</p>
-                    <p className="font-medium">
-                      Location: {currentSuggestion.location.latitude.toFixed(6)}, {currentSuggestion.location.longitude.toFixed(6)}
-                    </p>
-                    <p className="text-sm mt-2">{currentSuggestion.reason}</p>
-                  </div>
-                </div>
+                <SuggestionBinMap
+                  suggestionBins={[{
+                    _id: currentSuggestion._id,
+                    location: {
+                      type: "Point",
+                      coordinates: [currentSuggestion.location.longitude, currentSuggestion.location.latitude]
+                    },
+                    fillLevel: 0,
+                    wasteType: "GENERAL",
+                    lastCollected: new Date().toISOString(),
+                    address: currentSuggestion.address || "",
+                    reason: currentSuggestion.reason
+                  }]}
+                  style={{ height: "100%" }}
+                />
               </div>
             )}
           </div>
@@ -812,7 +1165,8 @@ export default function BinManagementPage() {
               </div>
             )}
           </DialogFooter>
-        </DialogContent>      </Dialog>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Bin Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -844,9 +1198,29 @@ export default function BinManagementPage() {
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-status" className="text-right">
+                Status
+              </Label>
+              <Select
+                value={editStatus}
+                onValueChange={setEditStatus}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={currentBin?.status || "Select status"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  <SelectItem value="PENDING_INSTALLATION">Pending Installation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-area" className="text-right">
                 Area
-              </Label>              <Select
+              </Label>
+              <Select
                 value={editAreaId}
                 onValueChange={setEditAreaId}
               >
@@ -854,7 +1228,7 @@ export default function BinManagementPage() {
                   <SelectValue placeholder="Select area (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {areas.map((area) => (
                     <SelectItem key={area.areaID} value={area.areaID}>
                       {area.areaName}

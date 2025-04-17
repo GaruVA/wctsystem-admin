@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import BinMap from "@/components/dashboard/bin-map";
+import SuggestionBinMap from "@/components/dashboard/suggestion-bin-map";
 import {
   RefreshCcw,
   Trash2,
@@ -385,7 +386,6 @@ export default function DashboardPage() {
                     <div className="flex-1 min-h-0">
                     <BinMap
                       areas={filteredAreas}
-                      suggestionBins={suggestionBins}
                       fitToAreas={!selectedSuggestion}
                       onBinSelect={handleBinSelect}
                       selectedBin={selectedBin}
@@ -503,7 +503,7 @@ export default function DashboardPage() {
                     {issues.map((issue) => (
                       <div
                         key={issue._id}
-                        className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow"
+                        className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white"
                       >
                         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
                           <AlertTriangle size={20} />
@@ -526,97 +526,7 @@ export default function DashboardPage() {
                   </div>
                 )}
               </CardContent>
-            </Card>            {/* Bin Location Suggestions Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Map size={20} className="text-blue-500" />
-                  Bin Location Suggestions
-                </CardTitle>
-                <CardDescription>
-                  Quick summary of bin suggestions. Manage suggestions in the Bins page.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {suggestionsLoading ? (
-                  <div className="flex justify-center items-center py-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                    <span className="ml-2 text-sm text-muted-foreground">Loading suggestions...</span>
-                  </div>
-                ) : binSuggestions.length === 0 ? (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-muted-foreground">No bin location suggestions available.</p>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <p className="text-sm font-medium">{binSuggestions.length} suggestions available</p>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => window.location.href = "/dashboard/bins"}
-                      >
-                        Manage All Suggestions
-                      </Button>
-                    </div>
-                    
-                    {/* Map showing suggestion locations */}
-                    <div className="mb-4 h-[200px] rounded-md overflow-hidden border">
-                      <BinMap
-                        suggestionBins={suggestionBins}
-                        style={{ height: "100%" }}
-                        fitToAreas={false}
-                      />
-                    </div>
-                    
-                    {/* Show just a few recent suggestions */}
-                    {binSuggestions.slice(0, 2).map((suggestion) => (
-                      <div
-                        key={suggestion._id}
-                        className="flex items-start gap-3 p-3 border rounded-md shadow-sm bg-white mb-2"
-                      >
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-500">
-                          <Map size={16} />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-xs font-medium text-gray-800 truncate">
-                            {suggestion.address || `Location: ${suggestion.location.latitude.toFixed(6)}, ${suggestion.location.longitude.toFixed(6)}`}
-                          </h3>
-                          <p className="text-xs text-gray-500">
-                            <strong>Suggested:</strong> {formatRelativeTime(suggestion.createdAt)}
-                          </p>
-                        </div>
-                        <Button 
-                          size="sm" 
-                          variant="ghost"
-                          className="h-7 text-xs"
-                          onClick={() => {
-                            // Find the suggestion bin in the formatted bins
-                            const binToView = suggestionBins.find(bin => bin._id === suggestion._id);
-                            setSelectedBin(binToView || null);
-                            setSelectedSuggestion(suggestion);
-                          }}
-                        >
-                          View
-                        </Button>
-                      </div>
-                    ))}
-                    
-                    {binSuggestions.length > 2 && (
-                      <div className="text-center mt-2">
-                        <Button 
-                          variant="link" 
-                          size="sm"
-                          onClick={() => window.location.href = "/dashboard/bins"}
-                        >
-                          View all {binSuggestions.length} suggestions
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            </Card>          
           </div>
         </div>
       </section>
