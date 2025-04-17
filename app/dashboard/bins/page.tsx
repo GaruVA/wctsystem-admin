@@ -41,7 +41,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
-import BinMap from "@/components/dashboard/bin-map";
 import SuggestionBinMap from "@/components/dashboard/suggestion-bin-map";
 import { getAllAreasWithBins, AreaWithBins } from "@/lib/api/areas";
 
@@ -70,13 +69,6 @@ interface BinSuggestion {
   createdAt: string;
 }
 
-interface DrawMapDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onLocationSelect: (coordinates: [number, number]) => void;
-  initialLocation?: [number, number];
-}
-
 // Helper function to format relative time
 const formatRelativeTime = (dateString: string) => {
   const date = new Date(dateString);
@@ -92,84 +84,6 @@ const formatRelativeTime = (dateString: string) => {
   
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-};
-
-// Map Dialog Component for selecting coordinates
-const DrawMapDialog: React.FC<DrawMapDialogProps> = ({ 
-  open, 
-  onOpenChange, 
-  onLocationSelect,
-  initialLocation
-}) => {
-  // Stub location, would be replaced with actual Leaflet implementation in a full solution
-  const [selectedLocation, setSelectedLocation] = useState<[number, number] | undefined>(initialLocation);
-  
-  useEffect(() => {
-    // Initialize leaflet map with drawing controls here
-    // This is a simple placeholder
-    console.log("Initialize map with drawing controls");
-    // In a full implementation, you would:
-    // 1. Initialize leaflet map
-    // 2. Add drawing controls
-    // 3. Set up event handlers for drawing events
-  }, [open]);
-
-  // Simulating selecting a location for simplicity
-  // In a real implementation, this would come from the leaflet map
-  const handleSimulateSelect = () => {
-    // Dummy coordinates near Colombo, Sri Lanka
-    const coords: [number, number] = [79.861243, 6.927079];
-    setSelectedLocation(coords);
-  };
-
-  const handleConfirm = () => {
-    if (selectedLocation) {
-      onLocationSelect(selectedLocation);
-      onOpenChange(false);
-    } else {
-      toast({
-        title: "No location selected",
-        description: "Please select a location on the map",
-        variant: "destructive"
-      });
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px]">
-        <DialogHeader>
-          <DialogTitle>Select Bin Location</DialogTitle>
-          <DialogDescription>
-            Click on the map to select the bin location. You can zoom in and out for precision.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="h-[400px] border rounded-md bg-gray-100 flex items-center justify-center">
-          {/* This would be replaced with an actual map */}
-          <div className="text-center">
-            <p className="mb-4">Map would be displayed here with drawing controls</p>
-            <Button onClick={handleSimulateSelect} className="mb-2">
-              Simulate Location Selection
-            </Button>
-            {selectedLocation && (
-              <p className="text-sm">
-                Selected: {selectedLocation[1].toFixed(6)}, {selectedLocation[0].toFixed(6)}
-              </p>
-            )}
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button 
-            onClick={handleConfirm}
-            disabled={!selectedLocation}
-          >
-            Confirm Location
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 };
 
 // Main Bin Management Page Component
@@ -195,20 +109,22 @@ export default function BinManagementPage() {
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [viewMapDialogOpen, setViewMapDialogOpen] = useState<boolean>(false);
-  const [drawMapDialogOpen, setDrawMapDialogOpen] = useState<boolean>(false);
   const [currentBin, setCurrentBin] = useState<Bin | null>(null);
   const [currentSuggestion, setCurrentSuggestion] = useState<BinSuggestion | null>(null);
   
-  // Form states
+  // Form states for new bin
   const [newBinWasteType, setNewBinWasteType] = useState<string>("GENERAL");
-  const [newBinLocation, setNewBinLocation] = useState<[number, number] | null>(null);
+  const [newBinLatitude, setNewBinLatitude] = useState<string>("");
+  const [newBinLongitude, setNewBinLongitude] = useState<string>("");
   const [selectedAreaId, setSelectedAreaId] = useState<string>("");
-  const [newBinStatus, setNewBinStatus] = useState<string>("ACTIVE");
+  const [newBinStatus, setNewBinStatus] = useState<string>("PENDING_INSTALLATION");
   
-  // For edit dialog
+  // Form states for edit dialog
   const [editWasteType, setEditWasteType] = useState<string>("");
   const [editAreaId, setEditAreaId] = useState<string>("");
   const [editStatus, setEditStatus] = useState<string>("");
+  const [editLatitude, setEditLatitude] = useState<string>("");
+  const [editLongitude, setEditLongitude] = useState<string>("");
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -216,6 +132,7 @@ export default function BinManagementPage() {
     fetchBinSuggestions();
     fetchAreas();
   }, []); 
+  
   // Fetch bins from API
   const fetchBins = async () => {
     try {
@@ -272,10 +189,24 @@ export default function BinManagementPage() {
 
   // Handle creating a new bin
   const handleCreateBin = async () => {
-    if (!newBinLocation) {
+    // Validate latitude and longitude
+    if (!newBinLatitude || !newBinLongitude) {
       toast({
         title: "Location required",
-        description: "Please select a location for the bin",
+        description: "Please enter both latitude and longitude values",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Parse coordinates and validate
+    const lat = parseFloat(newBinLatitude);
+    const lng = parseFloat(newBinLongitude);
+    
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      toast({
+        title: "Invalid coordinates",
+        description: "Please enter valid latitude (-90 to 90) and longitude (-180 to 180) values",
         variant: "destructive"
       });
       return;
@@ -287,7 +218,7 @@ export default function BinManagementPage() {
         {
           location: {
             type: "Point",
-            coordinates: newBinLocation
+            coordinates: [lng, lat] // API expects [longitude, latitude]
           },
           wasteType: newBinWasteType,
           status: newBinStatus,
@@ -306,9 +237,10 @@ export default function BinManagementPage() {
       });
 
       // Reset form and refresh data
-      setNewBinLocation(null);
+      setNewBinLatitude("");
+      setNewBinLongitude("");
       setNewBinWasteType("GENERAL");
-      setNewBinStatus("ACTIVE");
+      setNewBinStatus("PENDING_INSTALLATION");
       setSelectedAreaId("");
       setCreateDialogOpen(false);
       fetchBins();
@@ -334,7 +266,9 @@ export default function BinManagementPage() {
             coordinates: [suggestion.location.longitude, suggestion.location.latitude]
           },
           wasteType: "GENERAL", // Default waste type
-          notes: suggestion.reason // Store the suggestion reason as notes
+          status: "PENDING_INSTALLATION", // Set default status to pending installation
+          notes: suggestion.reason, // Store the suggestion reason as notes
+          address: suggestion.address || undefined // Use address if available
         },
         {
           headers: {
@@ -352,7 +286,7 @@ export default function BinManagementPage() {
 
       toast({
         title: "Suggestion approved",
-        description: "A new bin has been created from the suggestion",
+        description: "A new bin has been created from the suggestion with Pending Installation status",
       });
 
       // Refresh data
@@ -429,19 +363,42 @@ export default function BinManagementPage() {
     return new Date(dateString).toLocaleString();
   };
 
-  // Handle location selection from map
-  const handleLocationSelect = (coordinates: [number, number]) => {
-    setNewBinLocation(coordinates);
-  };
   // Show suggestion on map dialog
   const handleViewSuggestionOnMap = (suggestion: BinSuggestion) => {
     setCurrentSuggestion(suggestion);
     setViewMapDialogOpen(true);
   };
 
+  // Set up edit dialog with current bin values
+  const openEditDialog = (bin: Bin) => {
+    setCurrentBin(bin);
+    // Initialize edit form with current values
+    setEditWasteType(bin.wasteType || "");
+    setEditStatus(bin.status || "");
+    setEditAreaId(bin.area || "");
+    setEditLatitude(bin.location.coordinates[1].toString());
+    setEditLongitude(bin.location.coordinates[0].toString());
+    setEditDialogOpen(true);
+  };
+
   // Handle editing a bin
   const handleEditBin = async () => {
     if (!currentBin) return;
+
+    // Validate latitude and longitude if they've been modified
+    if (editLatitude && editLongitude) {
+      const lat = parseFloat(editLatitude);
+      const lng = parseFloat(editLongitude);
+      
+      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        toast({
+          title: "Invalid coordinates",
+          description: "Please enter valid latitude (-90 to 90) and longitude (-180 to 180) values",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
 
     try {
       const updates: any = {};
@@ -458,11 +415,20 @@ export default function BinManagementPage() {
         updates.status = editStatus;
       }
       
+      // Add location update if coordinates were edited
+      if (editLatitude && editLongitude) {
+        updates.location = {
+          type: "Point",
+          coordinates: [parseFloat(editLongitude), parseFloat(editLatitude)]
+        };
+      }
+      
+      // Use direct-update endpoint which expects the binId in the request body
       await axios.post(
-        `http://localhost:5000/api/bins/update`,
+        `http://localhost:5000/api/bins/direct-update`,
         {
           binId: currentBin._id,
-          ...updates
+          updates: updates
         },
         {
           headers: {
@@ -476,6 +442,12 @@ export default function BinManagementPage() {
         description: "The bin has been updated successfully",
       });
 
+      // Reset edit state
+      setEditLatitude("");
+      setEditLongitude("");
+      setEditWasteType("");
+      setEditAreaId("");
+      setEditStatus("");
       setEditDialogOpen(false);
       fetchBins();
     } catch (error) {
@@ -493,16 +465,19 @@ export default function BinManagementPage() {
     if (!currentBin) return;
 
     try {
-      // This is a placeholder - your actual API might use a different endpoint
-      await axios.delete(`http://localhost:5000/api/bins/${currentBin._id}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("adminToken")}`
+      // Delete the bin directly from the database using DELETE method
+      await axios.delete(
+        `http://localhost:5000/api/bins/${currentBin._id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("adminToken")}`
+          }
         }
-      });
+      );
 
       toast({
         title: "Bin deleted",
-        description: "The bin has been deleted successfully",
+        description: "The bin has been permanently deleted from the database",
       });
 
       setDeleteDialogOpen(false);
@@ -702,24 +677,6 @@ export default function BinManagementPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                {(searchTerm || filterWasteType || filterFillLevel) && (
-                  <div className="flex items-end">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => {
-                        setSearchTerm("");
-                        setFilterWasteType("");
-                        setFilterFillLevel("");
-                        setFilterStatus("");
-                      }}
-                      className="mb-0.5"
-                    >
-                      Clear Filters
-                    </Button>
-                  </div>
-                )}
               </div>
 
               {/* Results summary */}
@@ -775,10 +732,7 @@ export default function BinManagementPage() {
                         <TableCell>{formatDate(bin.lastCollected)}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => {
-                              setCurrentBin(bin);
-                              setEditDialogOpen(true);
-                            }}>
+                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(bin)}>
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => {
@@ -1066,23 +1020,22 @@ export default function BinManagementPage() {
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">Location</Label>
-              <div className="col-span-3 flex items-center gap-2">
-                {newBinLocation ? (
-                  <div className="text-sm">
-                    Lat: {newBinLocation[1].toFixed(6)}, Lng: {newBinLocation[0].toFixed(6)}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">No location selected</div>
-                )}
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setDrawMapDialogOpen(true)}
-                >
-                  Select on Map
-                </Button>
-              </div>
+              <Label className="text-right">Latitude</Label>
+              <Input 
+                value={newBinLatitude}
+                onChange={(e) => setNewBinLatitude(e.target.value)}
+                placeholder="Enter latitude"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Longitude</Label>
+              <Input 
+                value={newBinLongitude}
+                onChange={(e) => setNewBinLongitude(e.target.value)}
+                placeholder="Enter longitude"
+                className="col-span-3"
+              />
             </div>
           </div>
           <DialogFooter>
@@ -1093,13 +1046,6 @@ export default function BinManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Map Dialog for Drawing/Selecting Location */}
-      <DrawMapDialog 
-        open={drawMapDialogOpen}
-        onOpenChange={setDrawMapDialogOpen}
-        onLocationSelect={handleLocationSelect}
-      />
 
       {/* View Suggestion on Map Dialog */}
       <Dialog open={viewMapDialogOpen} onOpenChange={setViewMapDialogOpen}>
@@ -1236,6 +1182,24 @@ export default function BinManagementPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Latitude</Label>
+              <Input 
+                value={editLatitude}
+                onChange={(e) => setEditLatitude(e.target.value)}
+                placeholder="Enter latitude"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Longitude</Label>
+              <Input 
+                value={editLongitude}
+                onChange={(e) => setEditLongitude(e.target.value)}
+                placeholder="Enter longitude"
+                className="col-span-3"
+              />
             </div>
           </div>
           <DialogFooter>

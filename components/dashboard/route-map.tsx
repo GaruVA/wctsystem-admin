@@ -141,13 +141,13 @@ const RouteMap: React.FC<RouteMapProps> = ({
     const sequenceNumberBadge = showSequenceNumbers && sequenceNumber ? 
       `<div style="
         position: absolute;
-        top: -10px;
-        left: -10px;
-        width: 20px;
-        height: 20px;
-        background-color: #1D4ED8;
+        top: -8px;
+        left: -8px;
+        width: 16px;
+        height: 16px;
+        background-color:rgb(255, 254, 254);
         border-radius: 50%;
-        color: white;
+        color: black;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -155,7 +155,6 @@ const RouteMap: React.FC<RouteMapProps> = ({
         font-weight: bold;
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         z-index: 2;
-        border: 2px solid white;
       ">${sequenceNumber}</div>` : '';
 
     // Regular bin icon with sequence number
@@ -208,6 +207,25 @@ const RouteMap: React.FC<RouteMapProps> = ({
     });
   };
 
+  // Create start and end markers
+  const createStartLocationMarker = () => {
+    return L.divIcon({
+      className: 'start-marker',
+      html: `<div style="width:14px;height:14px;border-radius:50%;background-color:green;border:2px solid white;"></div>`,
+      iconSize: [12, 12],
+      iconAnchor: [6, 6]
+    });
+  };
+  
+  const createEndLocationMarker = () => {
+    return L.divIcon({
+      className: 'end-marker',
+      html: `<div style="width:14px;height:14px;border-radius:50%;background-color:blue;border:2px solid white;"></div>`,
+      iconSize: [12, 12],
+      iconAnchor: [6, 6]
+    });
+  };
+
   // Add legend to the map
   const addLegend = () => {
     if (!mapRef.current) return;
@@ -234,10 +252,12 @@ const RouteMap: React.FC<RouteMapProps> = ({
             <span>Route Path</span>
           </div>
           <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 20px; height: 20px; display: flex; justify-content: center; align-items: center; margin-right: 5px;">
-              <div style="background-color: #1D4ED8; width: 16px; height: 16px; border-radius: 50%; color: white; font-size: 10px; display: flex; align-items: center; justify-content: center;">1</div>
-            </div>
-            <span>Sequence Numbers</span>
+            <div style="width: 14px; height: 14px; border-radius: 50%; background-color: green; border: 2px solid white; margin-right: 5px;"></div>
+            <span>Start Location</span>
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="width: 14px; height: 14px; border-radius: 50%; background-color: blue; border: 2px solid white; margin-right: 5px;"></div>
+            <span>End Location</span>
           </div>
         </div>
       `;
@@ -370,12 +390,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
       // Add markers for start and end locations
       if (area.startLocation && area.startLocation.coordinates) {
         L.marker([area.startLocation.coordinates[1], area.startLocation.coordinates[0]], {
-          icon: L.divIcon({
-            className: 'start-marker',
-            html: `<div style="width:14px;height:14px;border-radius:50%;background-color:green;border:2px solid white;"></div>`,
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
-          })
+          icon: createStartLocationMarker()
         })
         .bindPopup('<strong>Start Location</strong>')
         .addTo(mapRef.current);
@@ -383,12 +398,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
       
       if (area.endLocation && area.endLocation.coordinates) {
         L.marker([area.endLocation.coordinates[1], area.endLocation.coordinates[0]], {
-          icon: L.divIcon({
-            className: 'end-marker',
-            html: `<div style="width:14px;height:14px;border-radius:50%;background-color:blue;border:2px solid white;"></div>`,
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
-          })
+          icon: createEndLocationMarker()
         })
         .bindPopup('<strong>End Location</strong>')
         .addTo(mapRef.current);
@@ -430,6 +440,10 @@ const RouteMap: React.FC<RouteMapProps> = ({
       return marker;
     });
 
+    // Create markers for start and end locations
+    let startMarker: L.Marker | null = null;
+    let endMarker: L.Marker | null = null;
+
     // Draw route polyline if provided
     if (routePolyline && routePolyline.length > 0) {
       const routeCoords = routePolyline.map(coord => 
@@ -442,6 +456,27 @@ const RouteMap: React.FC<RouteMapProps> = ({
         opacity: 0.7,
         dashArray: '5, 10' // Make the route line dashed
       }).addTo(mapRef.current!);
+
+      // Add markers for start and end of the route
+      if (routePolyline.length > 0) {
+        // Start marker using first point of the route
+        const startPoint = routePolyline[0];
+        startMarker = L.marker(
+          [startPoint[1], startPoint[0]],
+          { icon: createStartLocationMarker() }
+        )
+        .bindPopup('<strong>Route Start</strong>')
+        .addTo(mapRef.current);
+
+        // End marker using last point of the route
+        const endPoint = routePolyline[routePolyline.length - 1];
+        endMarker = L.marker(
+          [endPoint[1], endPoint[0]],
+          { icon: createEndLocationMarker() }
+        )
+        .bindPopup('<strong>Route End</strong>')
+        .addTo(mapRef.current);
+      }
     }
 
     // Draw current segment if provided

@@ -522,30 +522,7 @@ const BinMap: React.FC<BinMapProps> = ({
         
         areaPolygonsRef.current.push(polygon);
         
-        // Add markers for start and end locations
-        if (area.startLocation && area.startLocation.coordinates) {
-          L.marker([area.startLocation.coordinates[1], area.startLocation.coordinates[0]], {
-            icon: L.divIcon({
-              className: 'start-marker',
-              html: `<div style="width:14px;height:14px;border-radius:50%;background-color:green;border:2px solid white;"></div>`,
-              iconSize: [12, 12],
-              iconAnchor: [6, 6]
-            })
-          })
-          .addTo(mapRef.current!);
-        }
-        
-        if (area.endLocation && area.endLocation.coordinates) {
-          L.marker([area.endLocation.coordinates[1], area.endLocation.coordinates[0]], {
-            icon: L.divIcon({
-              className: 'end-marker',
-              html: `<div style="width:14px;height:14px;border-radius:50%;background-color:blue;border:2px solid white;"></div>`,
-              iconSize: [12, 12],
-              iconAnchor: [6, 6]
-            })
-          })
-          .addTo(mapRef.current!);
-        }
+        // Removed start and end location markers as requested
       }
     });
 
