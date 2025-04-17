@@ -36,7 +36,8 @@ import {
   Map, 
   RefreshCcw,
   Check,
-  X
+  X,
+  MapPin
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
@@ -696,10 +697,10 @@ export default function BinManagementPage() {
                     <TableRow>
                       <TableHead>ID</TableHead>
                       <TableHead>Location</TableHead>
+                      <TableHead>Area</TableHead>
                       <TableHead>Waste Type</TableHead>
                       <TableHead>Fill Level</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Last Collected</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -709,6 +710,21 @@ export default function BinManagementPage() {
                         <TableCell className="font-medium">{bin._id}</TableCell>
                         <TableCell>
                           {bin.address || `${bin.location.coordinates[1].toFixed(6)}, ${bin.location.coordinates[0].toFixed(6)}`}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            // Find the area name from the area ID
+                            if (!bin.area) return (
+                              <Badge variant="outline" className="text-gray-500 bg-gray-100">Not assigned</Badge>
+                            );
+                            const areaName = areas.find(area => area.areaID === bin.area)?.areaName;
+                            return (
+                              <div className="flex items-center">
+                                <MapPin className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                                <span>{areaName || bin.area}</span>
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="capitalize">
@@ -729,7 +745,6 @@ export default function BinManagementPage() {
                             {formatBinStatus(bin.status || 'ACTIVE')}
                           </Badge>
                         </TableCell>
-                        <TableCell>{formatDate(bin.lastCollected)}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button variant="ghost" size="icon" onClick={() => openEditDialog(bin)}>
