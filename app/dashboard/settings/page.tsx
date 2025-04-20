@@ -192,7 +192,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   
-                  <div className="flex items-center justify-between space-y-0">
+                  <div className="flex items-center justify-between space-y-0 hidden">
                     <Label htmlFor="sms-alerts">SMS Alerts</Label>
                     <Switch 
                       id="sms-alerts" 

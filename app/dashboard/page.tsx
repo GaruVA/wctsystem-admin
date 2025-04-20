@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import BinMap from "@/components/dashboard/bin-map";
 import SuggestionBinMap from "@/components/dashboard/suggestion-bin-map";
+import { AreaStatusOverview } from "@/components/dashboard/area-status-overview";
 import {
   RefreshCcw,
   Trash2,
@@ -475,6 +476,9 @@ export default function DashboardPage() {
       {/* Issues and Bin Suggestions - Below the hero section */}
       <section className="px-8 pb-8">
         <div className="space-y-6">
+          {/* Area Status Overview */}
+          <AreaStatusOverview />
+          
           {/* Issues and Bin Suggestions Grid */}
           <div className="grid gap-4 md:grid-cols-1">
             {/* Issues Section */}

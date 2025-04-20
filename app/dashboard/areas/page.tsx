@@ -10,9 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { MapPin, Save, Plus, Trash2, Edit, Map, Info } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import AreaBoundaryMap from "@/components/dashboard/area-boundary-map"
+import SuggestionBinMap from "@/components/dashboard/suggestion-bin-map";
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { AreaStatusOverview } from "@/components/dashboard/area-status-overview";
 
 // Interface definitions
 interface Area {
@@ -58,12 +58,12 @@ export default function AreasPage() {
   const [selectedArea, setSelectedArea] = useState<Area | null>(null);
   const [areaToDelete, setAreaToDelete] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
-  
+
   const defaultGeometry = {
     type: "Polygon",
     coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]]
   };
-  
+
   // Form state for creating/editing an area
   const [areaForm, setAreaForm] = useState<AreaFormData>({
     name: "",
@@ -89,11 +89,11 @@ export default function AreasPage() {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch areas');
       }
-      
+
       const data = await response.json();
 
       // Simulate additional area statistics that would come from the backend
@@ -104,7 +104,7 @@ export default function AreasPage() {
         collectorCount: Math.floor(Math.random() * 3) + 1,
         fillRate: Math.floor(Math.random() * 100)
       }));
-      
+
       setAreas(enhancedData);
     } catch (error) {
       console.error('Error fetching areas:', error);
@@ -118,7 +118,7 @@ export default function AreasPage() {
     }
   };
 
-  const filteredAreas = areas.filter(area => 
+  const filteredAreas = areas.filter(area =>
     area.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -211,7 +211,7 @@ export default function AreasPage() {
 
   const handleUpdateArea = async () => {
     if (!selectedArea) return;
-    
+
     try {
       // Validate form data
       if (!areaForm.name.trim()) {
@@ -270,7 +270,7 @@ export default function AreasPage() {
     try {
       const token = localStorage.getItem('adminToken');
       const url = `http://localhost:5000/api/areas/${areaToDelete}`;
-      
+
       const response = await fetch(url, {
         method: 'DELETE',
         headers: {
@@ -278,16 +278,16 @@ export default function AreasPage() {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to delete area');
       }
-      
+
       toast({
         title: "Success",
         description: "Area deleted successfully and resources unassigned"
       });
-      
+
       setIsDeleteDialogOpen(false);
       fetchAreas();
     } catch (error) {
@@ -301,8 +301,8 @@ export default function AreasPage() {
   };
 
   const handleLocationChange = (
-    locationType: 'startLocation' | 'endLocation', 
-    coordIndex: number, 
+    locationType: 'startLocation' | 'endLocation',
+    coordIndex: number,
     value: string
   ) => {
     const numValue = parseFloat(value);
@@ -332,227 +332,224 @@ export default function AreasPage() {
   };
 
   return (
-      <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Areas</h1>
-          <div className="flex gap-3">
-            <div className="relative">
-              <Input
-                placeholder="Search areas..."
-                className="w-64 h-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Button onClick={handleOpenCreateDialog} size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Area
-            </Button>
+    <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Areas</h1>
+        <div className="flex gap-3">
+          <div className="relative">
+            <Input
+              placeholder="Search areas..."
+              className="w-64 h-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
+          <Button onClick={handleOpenCreateDialog} size="sm">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Area
+          </Button>
         </div>
+      </div>
 
-        {/* Area Status Overview */}
-        <AreaStatusOverview />
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
             <CardTitle className="flex items-center gap-2">
-                <Map className="h-5 w-5" />
-                <span>Area List</span>
+              <Map className="h-5 w-5" />
+              <span>Area List</span>
             </CardTitle>
-              <CardDescription className="mt-1.5">Configure and manage waste collection areas</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
+            <CardDescription className="mt-1.5">Configure and manage waste collection areas</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Area Name</TableHead>
+                  <TableHead>Start Location</TableHead>
+                  <TableHead>End Location</TableHead>
+                  <TableHead className="w-[100px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
                   <TableRow>
-                    <TableHead>Area Name</TableHead>
-                    <TableHead>Start Location</TableHead>
-                    <TableHead>End Location</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
+                    <TableCell colSpan={6} className="text-center">Loading areas...</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center">Loading areas...</TableCell>
-                    </TableRow>
-                  ) : filteredAreas.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center">
-                        {searchTerm ? "No matching areas found" : "No areas found"}
+                ) : filteredAreas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center">
+                      {searchTerm ? "No matching areas found" : "No areas found"}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredAreas.map((area) => (
+                    <TableRow key={area._id}>
+                      <TableCell className="font-medium">{area.name}</TableCell>
+                      <TableCell>{formatCoordinates(area.startLocation.coordinates)}</TableCell>
+                      <TableCell>{formatCoordinates(area.endLocation.coordinates)}</TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(area)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleOpenDeleteDialog(area._id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    filteredAreas.map((area) => (
-                      <TableRow key={area._id}>
-                        <TableCell className="font-medium">{area.name}</TableCell>
-                        <TableCell>{formatCoordinates(area.startLocation.coordinates)}</TableCell>
-                        <TableCell>{formatCoordinates(area.endLocation.coordinates)}</TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(area)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => handleOpenDeleteDialog(area._id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Create Area Dialog */}
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="sm:max-w-[700px]">
-            <DialogHeader>
-              <DialogTitle>Add New Area</DialogTitle>
-              <DialogDescription>
-                Create a new collection area with start and end points. 
-                Draw the area boundary on the map below.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="area-name">Area Name</Label>
-                <Input 
-                  id="area-name" 
-                  value={areaForm.name} 
-                  onChange={(e) => setAreaForm({...areaForm, name: e.target.value})}
-                  placeholder="e.g. Wellawatte South" 
+      {/* Create Area Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Add New Area</DialogTitle>
+            <DialogDescription>
+              Create a new collection area with start and end points.
+              Draw the area boundary on the map below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="area-name">Area Name</Label>
+              <Input
+                id="area-name"
+                value={areaForm.name}
+                onChange={(e) => setAreaForm({ ...areaForm, name: e.target.value })}
+                placeholder="e.g. Wellawatte South"
+              />
+            </div>
+
+            <div className="grid gap-2 mt-2">
+              <Label>Area Boundary</Label>
+              <div className="border rounded-md p-1 bg-gray-50">
+                <AreaBoundaryMap
+                  initialStartLocation={areaForm.startLocation.coordinates}
+                  initialEndLocation={areaForm.endLocation.coordinates}
+                  onBoundaryChange={(coordinates) =>
+                    setAreaForm(prev => ({
+                      ...prev,
+                      geometry: {
+                        type: "Polygon",
+                        coordinates
+                      }
+                    }))
+                  }
+                  onStartLocationChange={(coordinates) =>
+                    setAreaForm(prev => ({
+                      ...prev,
+                      startLocation: { coordinates }
+                    }))
+                  }
+                  onEndLocationChange={(coordinates) =>
+                    setAreaForm(prev => ({
+                      ...prev,
+                      endLocation: { coordinates }
+                    }))
+                  }
                 />
               </div>
-
-              <div className="grid gap-2 mt-2">
-                <Label>Area Boundary</Label>
-                <div className="border rounded-md p-1 bg-gray-50">
-                  <AreaBoundaryMap
-                    initialStartLocation={areaForm.startLocation.coordinates}
-                    initialEndLocation={areaForm.endLocation.coordinates}
-                    onBoundaryChange={(coordinates) => 
-                      setAreaForm(prev => ({
-                        ...prev, 
-                        geometry: { 
-                          type: "Polygon",
-                          coordinates 
-                        }
-                      }))
-                    }
-                    onStartLocationChange={(coordinates) => 
-                      setAreaForm(prev => ({
-                        ...prev, 
-                        startLocation: { coordinates }
-                      }))
-                    }
-                    onEndLocationChange={(coordinates) => 
-                      setAreaForm(prev => ({
-                        ...prev, 
-                        endLocation: { coordinates }
-                      }))
-                    }
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Use the drawing tools to define the area boundary. Set start and end locations using the buttons.
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Use the drawing tools to define the area boundary. Set start and end locations using the buttons.
+              </p>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateArea}>Create Area</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateArea}>Create Area</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        {/* Edit Area Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[700px]">
-            <DialogHeader>
-              <DialogTitle>Edit Area</DialogTitle>
-              <DialogDescription>
-                Update area details, boundary, and location points.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-area-name">Area Name</Label>
-                <Input 
-                  id="edit-area-name" 
-                  value={areaForm.name} 
-                  onChange={(e) => setAreaForm({...areaForm, name: e.target.value})}
+      {/* Edit Area Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Edit Area</DialogTitle>
+            <DialogDescription>
+              Update area details, boundary, and location points.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-area-name">Area Name</Label>
+              <Input
+                id="edit-area-name"
+                value={areaForm.name}
+                onChange={(e) => setAreaForm({ ...areaForm, name: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-2 mt-2">
+              <Label>Area Boundary and Locations</Label>
+              <div className="border rounded-md p-1 bg-gray-50">
+                <AreaBoundaryMap
+                  initialBoundary={areaForm.geometry?.coordinates}
+                  initialStartLocation={areaForm.startLocation.coordinates}
+                  initialEndLocation={areaForm.endLocation.coordinates}
+                  onBoundaryChange={(coordinates) =>
+                    setAreaForm(prev => ({
+                      ...prev,
+                      geometry: {
+                        type: "Polygon",
+                        coordinates
+                      }
+                    }))
+                  }
+                  onStartLocationChange={(coordinates) =>
+                    setAreaForm(prev => ({
+                      ...prev,
+                      startLocation: { coordinates }
+                    }))
+                  }
+                  onEndLocationChange={(coordinates) =>
+                    setAreaForm(prev => ({
+                      ...prev,
+                      endLocation: { coordinates }
+                    }))
+                  }
                 />
               </div>
-
-              <div className="grid gap-2 mt-2">
-                <Label>Area Boundary and Locations</Label>
-                <div className="border rounded-md p-1 bg-gray-50">
-                  <AreaBoundaryMap
-                    initialBoundary={areaForm.geometry?.coordinates}
-                    initialStartLocation={areaForm.startLocation.coordinates}
-                    initialEndLocation={areaForm.endLocation.coordinates}
-                    onBoundaryChange={(coordinates) => 
-                      setAreaForm(prev => ({
-                        ...prev, 
-                        geometry: { 
-                          type: "Polygon",
-                          coordinates 
-                        }
-                      }))
-                    }
-                    onStartLocationChange={(coordinates) => 
-                      setAreaForm(prev => ({
-                        ...prev, 
-                        startLocation: { coordinates }
-                      }))
-                    }
-                    onEndLocationChange={(coordinates) => 
-                      setAreaForm(prev => ({
-                        ...prev, 
-                        endLocation: { coordinates }
-                      }))
-                    }
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Edit the boundary by using the edit tools. Drag the start and end markers to reposition them.
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Edit the boundary by using the edit tools. Drag the start and end markers to reposition them.
+              </p>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleUpdateArea}>Save Changes</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpdateArea}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        {/* Delete Area Dialog */}
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="sm:max-w-[525px]">
-            <DialogHeader>
-              <DialogTitle>Delete Area</DialogTitle>
-              <DialogDescription>
-                This will permanently delete the area. All bins and collectors will be unassigned and will need to be reassigned later.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleDeleteArea}>Delete Area</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+      {/* Delete Area Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>Delete Area</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the area. All bins and collectors will be unassigned and will need to be reassigned later.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteArea}>Delete Area</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
