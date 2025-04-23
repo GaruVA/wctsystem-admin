@@ -13,6 +13,7 @@ import AreaBoundaryMap from "@/components/dashboard/area-boundary-map"
 import SuggestionBinMap from "@/components/dashboard/suggestion-bin-map";
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { AreaStatusOverview } from "@/components/dashboard/area-status-overview"
 
 // Interface definitions
 interface Area {
@@ -350,6 +351,9 @@ export default function AreasPage() {
           </Button>
         </div>
       </div>
+
+            {/* Add Area Status Overview at the top */}
+            <AreaStatusOverview />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
