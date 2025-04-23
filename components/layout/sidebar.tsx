@@ -40,13 +40,8 @@ export default function Sidebar({ className }: SidebarProps) {
       icon: Trash2,
     },
     {
-      name: "Routes",
-      path: "/dashboard/routes",
-      icon: Route,
-    },
-    {
-      name: "Schedule",
-      path: "/dashboard/schedule",
+      name: "Schedules",
+      path: "/dashboard/schedules",
       icon: CalendarClock,
     },
     {
@@ -55,7 +50,7 @@ export default function Sidebar({ className }: SidebarProps) {
       icon: Users,
     },
     {
-      name: "Reports",
+      name: "Analytics",
       path: "/dashboard/reports",
       icon: BarChart3,
     },
