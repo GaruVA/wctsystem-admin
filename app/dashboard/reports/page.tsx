@@ -129,7 +129,12 @@ export default function AdminReportsView() {
   const fillLevelTrendsData = {
     labels:
       Object.keys(fillLevelTrends).length > 0
-        ? fillLevelTrends[Object.keys(fillLevelTrends)[0]].map((_, index) => `Day ${index + 1}`)
+        ? fillLevelTrends[Object.keys(fillLevelTrends)[0]].map((bin) =>
+            new Date(bin.lastCollected).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })
+          )
         : [],
     datasets: Object.entries(fillLevelTrends).map(([areaName, bins], index) => ({
       label: areaName,
@@ -508,8 +513,9 @@ export default function AdminReportsView() {
               <CardTitle>Collection Efficiency Metrics</CardTitle>
               <CardDescription>Detailed efficiency and performance metrics</CardDescription>
             </CardHeader>
-            <CardContent className="h-[400px] flex items-center justify-center">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+            <CardContent className="h-[400px] flex flex-col items-center justify-center space-y-6">
+              {/* Collection Efficiency Chart */}
+              <div className="w-full">
                 <Bar
                   data={collectionEfficiencyChartData}
                   options={{
@@ -533,6 +539,10 @@ export default function AdminReportsView() {
                     },
                   }}
                 />
+              </div>
+
+              {/* Bin Utilization Chart */}
+              <div className="w-full">
                 <Bar
                   data={{
                     labels: collectionEfficiencyData.map((data) => data.areaName),
