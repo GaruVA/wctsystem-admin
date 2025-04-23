@@ -30,23 +30,13 @@ export default function Sidebar({ className }: SidebarProps) {
       icon: LayoutDashboard,
     },
     {
-      name: "Areas",
-      path: "/dashboard/areas",
+      name: "Assets",
+      path: "/dashboard/assets",
       icon: Map,
     },
     {
-      name: "Bins",
-      path: "/dashboard/bins",
-      icon: Trash2,
-    },
-    {
-      name: "Routes",
-      path: "/dashboard/routes",
-      icon: Route,
-    },
-    {
-      name: "Schedule",
-      path: "/dashboard/schedule",
+      name: "Scheduler",
+      path: "/dashboard/scheduler",
       icon: CalendarClock,
     },
     {
@@ -55,8 +45,8 @@ export default function Sidebar({ className }: SidebarProps) {
       icon: Users,
     },
     {
-      name: "Reports",
-      path: "/dashboard/reports",
+      name: "Analytics",
+      path: "/dashboard/analytics",
       icon: BarChart3,
     },
     {
