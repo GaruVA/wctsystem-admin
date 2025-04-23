@@ -7,19 +7,6 @@ export interface OptimizedRoute {
   distance: string | number; // Total distance in meters or formatted string
   duration: string | number; // Total duration in seconds or formatted string
   stops_sequence?: number[]; // The sequence of stops in the optimized order
-  steps?: RouteStep[]; // Turn-by-turn navigation instructions
-}
-
-// Interface for route steps
-export interface RouteStep {
-  instruction: string;
-  distance: string;
-  duration: number;
-  name: string;
-  maneuver: {
-    type: string;
-    modifier?: string;
-  };
 }
 
 // Interface for bin scheduling parameters
@@ -79,35 +66,6 @@ export async function getOptimizedRoute(areaId: string, parameters: RouteParamet
 }
 
 /**
- * Generate custom optimized route
- */
-export async function generateCustomRoute(
-  start: [number, number], 
-  stops: Array<[number, number]>, 
-  end: [number, number]
-): Promise<OptimizedRoute> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/route-optimization/custom`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-      },
-      body: JSON.stringify({ start, stops, end })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to generate route: ${response.status} ${response.statusText}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error generating custom route:', error);
-    throw error;
-  }
-}
-
-/**
  * Save a route schedule to the database
  */
 export async function saveRouteSchedule(scheduleData: any): Promise<any> {
@@ -128,43 +86,6 @@ export async function saveRouteSchedule(scheduleData: any): Promise<any> {
     return await response.json();
   } catch (error) {
     console.error('Error saving route schedule:', error);
-    throw error;
-  }
-}
-
-/**
- * Adjust an existing route by adding/removing bins or reordering them
- */
-export async function adjustExistingRoute(
-  areaId: string,
-  existingRoute: any,
-  includeBins: string[] = [],
-  excludeBins: string[] = [],
-  binOrder: string[] = []
-): Promise<any> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/route-optimization/adjust-existing`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-      },
-      body: JSON.stringify({
-        areaId,
-        existingRoute,
-        includeBins,
-        excludeBins,
-        binOrder
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to adjust route: ${response.status} ${response.statusText}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error adjusting route:', error);
     throw error;
   }
 }

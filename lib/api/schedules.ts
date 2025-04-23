@@ -138,14 +138,17 @@ export async function getAllSchedules(
 /**
  * Get schedule by ID
  */
-export async function getScheduleById(scheduleId: string): Promise<Schedule> {
+export async function getScheduleById(scheduleId: string, populateBins: boolean = false): Promise<Schedule> {
   try {
     const token = localStorage.getItem('adminToken');
     if (!token) {
       throw new Error('Authentication token not found');
     }
     
-    const response = await fetch(`${API_BASE_URL}/schedules/${scheduleId}`, {
+    // Add query parameter for bin population if requested
+    const queryParams = populateBins ? '?populateBins=true' : '';
+    
+    const response = await fetch(`${API_BASE_URL}/schedules/${scheduleId}${queryParams}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

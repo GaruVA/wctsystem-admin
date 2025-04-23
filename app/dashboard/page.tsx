@@ -1,6 +1,7 @@
+// filepath: c:\Users\0002288\Desktop\wct\admin\app\dashboard\page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import {
   Card,
@@ -10,7 +11,9 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import BinMap from "@/components/dashboard/bin-map";
+import SuggestionBinMap from "@/components/dashboard/suggestion-bin-map";
 import { AreaStatusOverview } from "@/components/dashboard/area-status-overview";
 import {
   RefreshCcw,
@@ -24,7 +27,8 @@ import {
 } from "lucide-react";
 import { getAllAreasWithBins, AreaWithBins, Bin } from "@/lib/api/areas";
 import { cn } from "@/lib/utils";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getUnreadAlerts, Alert, AlertSeverity, AlertType, markAsRead, markAllAsRead } from "@/lib/api/alerts";
+import { toast } from "@/components/ui/use-toast";
 
 const api = axios.create({
   baseURL: "http://localhost:5000/api",
@@ -40,26 +44,26 @@ interface AnalyticsData {
   };
 }
 
-interface Alert {
-  id: string;
-  title: string;
-  description: string;
-  time: string;
-  severity: 'high' | 'medium' | 'low';
-  type: string;
-}
-
 interface Issue {
   _id: string;
-  bin: { name: string };
+  bin: { _id: string };
   issueType: string;
   description?: string;
   createdAt: string;
 }
 
+interface BinSuggestion {
+  _id: string;
+  reason: string;
+  location: {
+    longitude: number;
+    latitude: number;
+  };
+  address?: string; // Added optional address property
+  createdAt: string;
+}
+
 export default function DashboardPage() {
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
   const [areas, setAreas] = useState<AreaWithBins[]>([]);
@@ -69,108 +73,15 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [issuesLoading, setIssuesLoading] = useState(true);
-
-  const [overallStats, setOverallStats] = useState({
-    avgUtilization: 0,
-    totalBins: 0,
-    avgEfficiency: 0,
-    avgDelay: 0,
-    criticalBins: 0,
-    routeCompletion: 75 // Simulated data, replace with actual data when available
-  });
+  const [binSuggestions, setBinSuggestions] = useState<BinSuggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(true);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<BinSuggestion | null>(null);
+  const [suggestionBins, setSuggestionBins] = useState<Bin[]>([]); // New state for suggestion bins formatted for map
 
   useEffect(() => {
-    fetchAnalytics();
     fetchAreas();
-    generateMockAlerts(); // Replace with real alerts API when available
+    fetchAlerts();
   }, []);
-
-  useEffect(() => {
-    if (analytics) {
-      const areas = Object.values(analytics);
-      const totalBins = areas.reduce((acc, area) => acc + area.bins, 0);
-      const avgUtil = areas.reduce((acc, area) => acc + area.utilization, 0) / areas.length;
-      const avgEff = areas.reduce((acc, area) => acc + area.collectionEfficiency, 0) / areas.length;
-      const avgDelay = areas.reduce((acc, area) => acc + area.serviceDelay, 0) / areas.length;
-
-      // Get count of bins with fill level > 80%
-      let criticalBinsCount = 0;
-      areas.forEach(area => {
-        if (area && typeof area === 'object' && 'bins' in area) {
-          const bins = area.bins;
-          if (Array.isArray(bins)) {
-            criticalBinsCount += bins.filter(bin => bin && bin.fillLevel > 80).length;
-          }
-        }
-      });
-
-      setOverallStats({
-        totalBins,
-        avgUtilization: avgUtil,
-        avgEfficiency: avgEff,
-        avgDelay: avgDelay,
-        criticalBins: criticalBinsCount || Math.round(totalBins * 0.15), // Fallback to estimation
-        routeCompletion: 75 // Simulated data
-      });
-    }
-  }, [analytics]);
-
-  const fetchAnalytics = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get("/analytics/analytics", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
-        },
-      });
-      setAnalytics(response.data as AnalyticsData);
-      setError(null);
-    } catch (err: any) {
-      setError("Failed to fetch analytics data");
-
-      // Mock data for development
-      setAnalytics({
-        "Area-001": {
-          utilization: 78,
-          collectionEfficiency: 92,
-          serviceDelay: 12,
-          bins: 34,
-          wasteTypeDistribution: {
-            "GENERAL": 15,
-            "ORGANIC": 8,
-            "RECYCLE": 7,
-            "HAZARDOUS": 4
-          }
-        },
-        "Area-002": {
-          utilization: 65,
-          collectionEfficiency: 87,
-          serviceDelay: 18,
-          bins: 28,
-          wasteTypeDistribution: {
-            "GENERAL": 12,
-            "ORGANIC": 6,
-            "RECYCLE": 7,
-            "HAZARDOUS": 3
-          }
-        },
-        "Area-003": {
-          utilization: 83,
-          collectionEfficiency: 95,
-          serviceDelay: 8,
-          bins: 42,
-          wasteTypeDistribution: {
-            "GENERAL": 20,
-            "ORGANIC": 10,
-            "RECYCLE": 8,
-            "HAZARDOUS": 4
-          }
-        }
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchAreas = async () => {
     try {
@@ -186,73 +97,105 @@ export default function DashboardPage() {
     }
   };
 
-  // Generate mock alerts - replace with real API call when available
-  const generateMockAlerts = () => {
-    const mockAlerts: Alert[] = [
-      {
-        id: '1',
-        title: 'Critical Bin Level',
-        description: 'Bin HZ-789 has reached 95% capacity in Wellawatte South',
-        time: '2 minutes ago',
-        severity: 'high',
-        type: 'bin'
-      },
-      {
-        id: '2',
-        title: 'Collection Route Completed',
-        description: 'Collector John Smith has completed Route #34',
-        time: '15 minutes ago',
-        severity: 'medium',
-        type: 'route'
-      },
-      {
-        id: '3',
-        title: 'System Maintenance',
-        description: 'Scheduled maintenance on April 10, 2025 from 2-4am',
-        time: '1 hour ago',
-        severity: 'low',
-        type: 'system'
-      }
-    ];
-
-    setAlerts(mockAlerts);
+  // Fetch real alerts from the API
+  const fetchAlerts = async () => {
+    try {
+      const alertsData = await getUnreadAlerts();
+      setAlerts(alertsData);
+    } catch (err) {
+      console.error('Error fetching alerts:', err);
+      toast({
+        title: "Error fetching alerts",
+        description: "Could not retrieve the latest alerts",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Handle clearing a single alert
+  const handleClearAlert = async (alertId: string) => {
+    try {
+      await markAsRead(alertId);
+      setAlerts(alerts.filter(alert => alert._id !== alertId));
+      toast({
+        title: "Alert cleared",
+        description: "The alert has been marked as read",
+      });
+    } catch (err) {
+      console.error('Error clearing alert:', err);
+      toast({
+        title: "Error clearing alert",
+        description: "Could not mark the alert as read",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Handle clearing all alerts
+  const handleClearAllAlerts = async () => {
+    try {
+      await markAllAsRead();
+      setAlerts([]);
+      toast({
+        title: "All alerts cleared",
+        description: "All alerts have been marked as read",
+      });
+    } catch (err) {
+      console.error('Error clearing all alerts:', err);
+      toast({
+        title: "Error clearing alerts",
+        description: "Could not mark all alerts as read",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleBinSelect = (bin: Bin | null) => {
     setSelectedBin(bin);
   };
 
-  const getStatusColor = (value: number, isDelay = false) => {
-    if (isDelay) {
-      return value < 10 ? 'text-green-500' : value < 20 ? 'text-amber-500' : 'text-red-500';
-    }
-    return value > 80 ? 'text-green-500' : value > 60 ? 'text-amber-500' : 'text-red-500';
-  };
-
   const filteredAreas = selectedArea
     ? areas.filter(area => area.areaID === selectedArea)
     : areas;
 
-  const getAlertIcon = (severity: string, type: string) => {
-    if (type === 'bin') return <Trash2 className="h-5 w-5" />;
-    if (type === 'route') return <Truck className="h-5 w-5" />;
-    if (type === 'system') return <AlertCircle className="h-5 w-5" />;
-    return <AlertTriangle className="h-5 w-5" />;
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case AlertType.BIN_FILL_LEVEL: return <Trash2 className="h-5 w-5" />;
+      case AlertType.AREA_FILL_LEVEL: return <Map className="h-5 w-5" />;
+      case AlertType.MISSED_COLLECTION: return <Truck className="h-5 w-5" />;
+      default: return <AlertTriangle className="h-5 w-5" />;
+    }
   };
 
   const getAlertColor = (severity: string) => {
     switch (severity) {
-      case 'high': return 'text-red-500 bg-red-100';
-      case 'medium': return 'text-amber-500 bg-amber-100';
-      case 'low': return 'text-blue-500 bg-blue-100';
+      case AlertSeverity.HIGH: return 'text-red-500 bg-red-100';
+      case AlertSeverity.MEDIUM: return 'text-amber-500 bg-amber-100';
+      case AlertSeverity.LOW: return 'text-blue-500 bg-blue-100';
       default: return 'text-gray-500 bg-gray-100';
     }
   };
 
+  // Format relative time for alerts
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  };
   useEffect(() => {
     const fetchIssues = async () => {
       try {
-        const response = await axios.get<Issue[]>("http://localhost:5000/api/issue"); // Replace with your backend URL
+        const response = await axios.get<Issue[]>("http://localhost:5000/api/issue");
         setIssues(response.data);
       } catch (error) {
         console.error("Error fetching issues:", error);
@@ -264,104 +207,145 @@ export default function DashboardPage() {
     fetchIssues();
   }, []);
 
+  // Create a Set of bin IDs that have issues for easy lookup
+  const binsWithIssues = React.useMemo(() => {
+    const issuesBinIds = new Set<string>();
+    issues.forEach(issue => {
+      if (issue.bin && issue.bin._id) {
+        issuesBinIds.add(issue.bin._id);
+      }
+    });
+    return issuesBinIds;
+  }, [issues]);
+
+  useEffect(() => {
+    const fetchBinSuggestions = async () => {
+      try {
+        setSuggestionsLoading(true);
+        const response = await axios.get<BinSuggestion[]>("http://localhost:5000/api/bin-suggestions", {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+          },
+        });
+        setBinSuggestions(response.data);
+      } catch (error) {
+        console.error("Error fetching bin suggestions:", error);
+      } finally {
+        setSuggestionsLoading(false);
+      }
+    };
+
+    fetchBinSuggestions();
+  }, []);
+
+  useEffect(() => {
+    // Convert bin suggestions to map-compatible format when they're loaded
+    if (binSuggestions.length > 0) {
+      const formattedSuggestions = binSuggestions.map(suggestion => createSuggestionBin(suggestion));
+      setSuggestionBins(formattedSuggestions);
+    }
+  }, [binSuggestions]);
+
+  // Create suggestion bins for the map when a suggestion is selected
+  const createSuggestionBin = (suggestion: BinSuggestion): any => {
+    return {
+      _id: suggestion._id,
+      name: "Suggested Bin",
+      binID: `suggestion-${suggestion._id}`,
+      location: {
+        type: "Point",
+        coordinates: [suggestion.location.longitude, suggestion.location.latitude]
+      },
+      fillLevel: 0,
+      wasteType: "GENERAL",
+      status: "ACTIVE",
+      lastEmptied: new Date().toISOString(),
+      createdAt: suggestion.createdAt,
+      updatedAt: suggestion.createdAt,
+      address: suggestion.address || "",
+      isSuggestion: true,
+      reason: suggestion.reason
+    };
+  };
+
+  const handleRejectSuggestion = async (suggestionId: string) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/bin-suggestions/${suggestionId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+      });
+      
+      // Remove the rejected suggestion from state
+      setBinSuggestions(prev => prev.filter(suggestion => suggestion._id !== suggestionId));
+      
+      // Show success toast
+      toast({
+        title: "Suggestion rejected",
+        description: "The bin suggestion has been removed.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error rejecting bin suggestion:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reject bin suggestion. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-          >
-            Export
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              fetchAnalytics();
-              fetchAreas();
-              generateMockAlerts();
-            }}
-            disabled={loading || areasLoading}
-          >
-            {(loading || areasLoading) ? (
-              <RefreshCcw size={16} className="animate-spin mr-2" />
-            ) : (
-              <RefreshCcw size={16} className="mr-2" />
-            )}
-            Refresh Data
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Bins</CardTitle>
-              <Trash2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overallStats.totalBins}</div>
-              <p className="text-xs text-muted-foreground">Across all collection areas</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg. Utilization</CardTitle>
-              <Percent className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold flex items-center gap-1">
-                {overallStats.avgUtilization.toFixed(1)}%
-                <ArrowUpRight className={`h-4 w-4 ${getStatusColor(overallStats.avgUtilization)}`} />
-              </div>
-              <p className="text-xs text-muted-foreground">+2.5% from last week</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Collection Efficiency</CardTitle>
-              <Truck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold flex items-center gap-1">
-                {overallStats.avgEfficiency.toFixed(1)}%
-              </div>
-              <div className="mt-1 h-2 w-full rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-green-500" style={{ width: `${overallStats.avgEfficiency}%` }} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Critical Bins</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-500">{overallStats.criticalBins}</div>
-              <p className="text-xs text-muted-foreground">Bins above 80% fill level</p>
-            </CardContent>
-          </Card>
+    <div className="flex flex-col">
+      {/* Full-height hero section - 100vh */}
+      <section className="flex flex-col h-screen px-2 pt-2">
+        {/* Fixed-height header section */}
+        <div className="flex items-center justify-between p-4 md:p-6">
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+            >
+              Export
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                fetchAreas();
+                fetchAlerts();
+              }}
+              disabled={loading || areasLoading}
+            >
+              {(loading || areasLoading) ? (
+                <RefreshCcw size={16} className="animate-spin mr-2" />
+              ) : (
+                <RefreshCcw size={16} className="mr-2" />
+              )}
+              Refresh Data
+            </Button>
+          </div>
         </div>
 
-        {/* Map and Alerts */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="col-span-3 md:col-span-2">
-            <CardHeader>
+        {/* Map and Alerts container - fills remaining height */}
+        <div className="flex-1 grid gap-4 px-4 pb-4 md:px-6 md:pb-6 md:grid-cols-3">
+          {/* Map card - takes 2/3 width on md+ screens */}
+          <Card className="col-span-3 md:col-span-2 flex flex-col">
+            <CardHeader className="flex-shrink-0">
               <CardTitle className="flex items-center gap-2">
                 <Map size={18} />
                 Waste Collection Areas
+                {selectedSuggestion && (
+                  <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-700">
+                    Viewing Bin Suggestion
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
                 Collection areas with bin locations and boundaries
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-0 h-[438px]">
+            <CardContent className="p-0 flex-1 min-h-0">
               {areasLoading && (
                 <div className="flex justify-center items-center h-full">
                   <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
@@ -375,14 +359,14 @@ export default function DashboardPage() {
               )}
 
               {!areasLoading && !areasError && (
-                <>
-                  <div className="mb-4 flex flex-wrap gap-2 px-6">
+                <div className="flex flex-col h-full">
+                  <div className="mb-4 flex flex-wrap gap-2 px-6 pt-2">
                     <button
                       onClick={() => setSelectedArea(null)}
                       className={`px-3 py-1 text-sm rounded ${selectedArea === null
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                        }`}
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300'
+                      }`}
                     >
                       All Areas ({areas.length})
                     </button>
@@ -392,66 +376,94 @@ export default function DashboardPage() {
                         key={area.areaID}
                         onClick={() => setSelectedArea(area.areaID)}
                         className={`px-3 py-1 text-sm rounded ${selectedArea === area.areaID
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 hover:bg-gray-300'
-                          }`}
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
                       >
                         {area.areaName} ({area.bins.length})
                       </button>
                     ))}
                   </div>
-
-                  <BinMap
-                    areas={filteredAreas}
-                    fitToAreas={true}
-                    onBinSelect={handleBinSelect}
-                    selectedBin={selectedBin}
-                    style={{ height: "395px" }}
-                  />
-                </>
+                    <div className="flex-1 min-h-0">
+                    <BinMap
+                      areas={filteredAreas}
+                      fitToAreas={!selectedSuggestion}
+                      onBinSelect={handleBinSelect}
+                      selectedBin={selectedBin}
+                      style={{ height: "100%" }}
+                      binsWithIssues={binsWithIssues}
+                    />
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Real-time alerts container */}
-          <Card className="col-span-3 md:col-span-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle size={18} className="text-amber-500" />
-                Real-time Alerts
-              </CardTitle>
-              <CardDescription>
-                System notifications and important updates
-              </CardDescription>
+          {/* Real-time alerts container - takes 1/3 width on md+ screens */}
+          <Card className="col-span-3 md:col-span-1 flex flex-col">
+            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle size={18} className="text-amber-500" />
+                  Real-time Alerts
+                </CardTitle>
+                <CardDescription>
+                  System notifications and important updates
+                </CardDescription>
+              </div>
+              {alerts.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearAllAlerts}
+                >
+                  Clear All
+                </Button>
+              )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 overflow-auto">
               <div className="space-y-4">
-                {alerts.map((alert) => (
+                {alerts.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">No alerts at this time.</p>
+                  </div>
+                ) : alerts.map((alert) => (
                   <div
-                    key={alert.id}
+                    key={alert._id}
                     className={cn(
                       "flex items-start gap-4 rounded-md border p-3",
-                      alert.severity === "high"
+                      alert.severity === AlertSeverity.HIGH
                         ? "border-red-200 bg-red-50"
-                        : alert.severity === "medium"
+                        : alert.severity === AlertSeverity.MEDIUM
                           ? "border-yellow-200 bg-yellow-50"
                           : "border-blue-200 bg-blue-50"
                     )}
                   >
                     <div className={cn(
-                      "p-2 rounded-full",
-                      alert.severity === "high"
-                        ? "text-red-500 bg-red-100"
-                        : alert.severity === "medium"
-                          ? "text-yellow-500 bg-yellow-100"
-                          : "text-blue-500 bg-blue-100"
+                      "p-2 rounded-full flex-shrink-0",
+                      getAlertColor(alert.severity)
                     )}>
-                      {getAlertIcon(alert.severity, alert.type)}
+                      {getAlertIcon(alert.type)}
                     </div>
-                    <div className="grid gap-1">
-                      <p className="text-sm font-medium">{alert.title}</p>
+                    <div className="grid gap-1 flex-1">
+                      <div className="flex justify-between items-start">
+                        <p className="text-sm font-medium">{alert.title}</p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 rounded-full -mt-1 -mr-1"
+                          onClick={() => handleClearAlert(alert._id)}
+                          title="Mark as read"
+                        >
+                          <span className="sr-only">Mark as read</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                          </svg>
+                        </Button>
+                      </div>
                       <p className="text-xs text-muted-foreground">{alert.description}</p>
-                      <p className="text-xs text-muted-foreground">{alert.time}</p>
+                      <p className="text-xs text-muted-foreground">{formatRelativeTime(alert.createdAt)}</p>
                     </div>
                   </div>
                 ))}
@@ -459,61 +471,69 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Issues Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle size={20} className="text-red-500" />
-              Reported Issues
-            </CardTitle>
-            <CardDescription>
-              A detailed list of reported issues in the system.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {issuesLoading ? (
-              <div className="flex justify-center items-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                <span className="ml-2 text-sm text-muted-foreground">Loading issues...</span>
-              </div>
-            ) : issues.length === 0 ? (
-              <div className="text-center py-4">
-                <p className="text-sm text-muted-foreground">No issues reported.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {issues.map((issue) => (
-                  <div
-                    key={issue._id}
-                    className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
-                      <AlertTriangle size={20} />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm font-medium text-gray-800">
-                        {issue.issueType}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {issue.description || "No description provided"}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        <strong>Bin:</strong> {issue.bin?.name || "Unknown"} |{" "}
-                        <strong>Reported At:</strong>{" "}
-                        {new Date(issue.createdAt).toLocaleString()}
-                      </p>
-                    </div>
+      </section>
+      
+      {/* Issues and Bin Suggestions - Below the hero section */}
+      <section className="px-8 pb-8">
+        <div className="space-y-6">
+          {/* Area Status Overview */}
+          <AreaStatusOverview />
+          
+          {/* Issues and Bin Suggestions Grid */}
+          <div className="grid gap-4 md:grid-cols-1">
+            {/* Issues Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle size={20} className="text-red-500" />
+                  Reported Issues
+                </CardTitle>
+                <CardDescription>
+                  A detailed list of reported issues in the system.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {issuesLoading ? (
+                  <div className="flex justify-center items-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                    <span className="ml-2 text-sm text-muted-foreground">Loading issues...</span>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Area Status Overview */}
-        <AreaStatusOverview />
-      </div>
+                ) : issues.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">No issues reported.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                    {issues.map((issue) => (
+                      <div
+                        key={issue._id}
+                        className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white"
+                      >
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
+                          <AlertTriangle size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-sm font-medium text-gray-800">
+                            {issue.issueType}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            {issue.description || "No description provided"}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            <strong>Bin:</strong> {issue.bin?._id || "Unknown"} |{" "}
+                            <strong>Reported At:</strong>{" "}
+                            {new Date(issue.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>          
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -25,6 +25,15 @@ interface BinMapProps {
   selectedBin?: Bin | null;
   style?: React.CSSProperties;
   colorByArea?: boolean;
+  suggestionBins?: Bin[]; // Add prop for suggestion bins
+  binsWithIssues?: Set<string>; // Add prop for tracking bins with issues
+}
+
+// Extend the Bin type to include suggestion-specific properties
+interface ExtendedBin extends Bin {
+  isSuggestion?: boolean;
+  reason?: string;
+  status?: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE' | 'PENDING_INSTALLATION';
 }
 
 const BinMap: React.FC<BinMapProps> = ({
@@ -42,9 +51,12 @@ const BinMap: React.FC<BinMapProps> = ({
   onBinDoubleClick,
   selectedBin = null,
   style,
-  colorByArea = true
+  colorByArea = true,
+  suggestionBins = [], // Add default empty array for suggestion bins
+  binsWithIssues = new Set() // Add default empty Set for bins with issues
 }) => {
   const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
   const binMarkersRef = useRef<L.Marker[]>([]);
   const routePolylineRef = useRef<L.Polyline | null>(null);
   const currentSegmentPolylineRef = useRef<L.Polyline | null>(null);
@@ -69,9 +81,16 @@ const BinMap: React.FC<BinMapProps> = ({
       setAreaColors(colors);
     }
   }, [areas, colorByArea]);
-
   // Custom icon for bins
-  const createBinIcon = (fillLevel: number, wasteType?: string, areaId?: string) => {
+  const createBinIcon = (
+    fillLevel: number, 
+    wasteType?: string, 
+    areaId?: string, 
+    isSuggestion?: boolean,
+    binId?: string,
+    hasIssue?: boolean,
+    status?: string
+  ) => {
     // Fill level colors (primary color indicator)
     const getFillLevelColor = (level: number) => {
       if (level >= 90) return '#EF4444'; // Red
@@ -80,8 +99,81 @@ const BinMap: React.FC<BinMapProps> = ({
       return '#10B981'; // Green
     };
 
-    const fillLevelColor = getFillLevelColor(fillLevel);
+    // Get status indicator color and style
+    const getStatusIndicator = (status?: string) => {
+      switch(status) {
+        case 'MAINTENANCE':
+          return `<div style="
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 16px;
+            height: 16px;
+            background-color: #F59E0B;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+          ">M</div>`;
+        case 'INACTIVE':
+          return `<div style="
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 16px;
+            height: 16px;
+            background-color: #6B7280;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+          ">I</div>`;
+        case 'PENDING_INSTALLATION':
+          return `<div style="
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 16px;
+            height: 16px;
+            background-color: #8B5CF6;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+          ">P</div>`;
+        default:
+          return ''; // ACTIVE status - no indicator needed
+      }
+    };
 
+    // Get fill level color based on status
+    const getBinColor = (fillLevel: number, status?: string) => {
+      // For inactive bins, always gray
+      if (status === 'INACTIVE') return '#6B7280';
+      // For pending installation, always purple
+      if (status === 'PENDING_INSTALLATION') return '#8B5CF6';
+      // For other statuses, use the fill level color
+      return getFillLevelColor(fillLevel);
+    };
+
+    const fillLevelColor = getBinColor(fillLevel, status);
+
+    // Regular bin icon
     return L.divIcon({
       className: 'custom-bin-marker',
       html: `
@@ -90,7 +182,9 @@ const BinMap: React.FC<BinMapProps> = ({
           width: 24px; 
           height: 28px;
         ">
+          ${getStatusIndicator(status)}
           <div style="
+          margin-top: 3px;
             width: 24px;
             height: 24px;
             background-color: ${fillLevelColor};
@@ -103,6 +197,7 @@ const BinMap: React.FC<BinMapProps> = ({
             font-weight: bold;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             position: relative;
+            ${status === 'INACTIVE' ? 'opacity: 0.7;' : ''}
           ">
             ${fillLevel}%
           </div>
@@ -165,7 +260,27 @@ const BinMap: React.FC<BinMapProps> = ({
             <span>≥ 90% - Critical</span>
           </div>
           
-          <div style="font-weight: bold; margin-bottom: 5px;">Waste Types</div>
+          <div style="font-weight: bold; margin-bottom: 5px;">Bin Status</div>
+          <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="position: relative; width: 15px; height: 15px; margin-right: 5px;">
+              <div style="width: 10px; height: 10px; background-color: #F59E0B; border-radius: 50%; font-size: 8px; color: white; text-align: center; line-height: 10px; font-weight: bold;">M</div>
+            </div>
+            <span>Maintenance</span>
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <div style="position: relative; width: 15px; height: 15px; margin-right: 5px;">
+              <div style="width: 10px; height: 10px; background-color: #6B7280; border-radius: 50%; font-size: 8px; color: white; text-align: center; line-height: 10px; font-weight: bold;">I</div>
+            </div>
+            <span>Inactive</span>
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 10px;">
+            <div style="position: relative; width: 15px; height: 15px; margin-right: 5px;">
+              <div style="width: 10px; height: 10px; background-color: #8B5CF6; border-radius: 50%; font-size: 8px; color: white; text-align: center; line-height: 10px; font-weight: bold;">P</div>
+            </div>
+            <span>Pending Installation</span>
+          </div>
+          
+          <div style="font-weight: bold; margin-bottom: 5px; margin-top: 10px;">Waste Types</div>
           <div style="font-size: 11px; margin-top: 3px;">
             <span class="font-medium">GEN</span> - General
           </div>
@@ -188,9 +303,9 @@ const BinMap: React.FC<BinMapProps> = ({
 
   // Initialize map
   useEffect(() => {
-    if (!mapRef.current && !mapInitializedRef.current) {
+    if (!mapRef.current && !mapInitializedRef.current && mapContainerRef.current) {
       // Default to Sri Lanka coordinates if no specific location is provided
-      const map = L.map('map-container', {
+      const map = L.map(mapContainerRef.current, {
         center: [7.8731, 80.7718], // Sri Lanka center
         zoom: 9
       });
@@ -289,7 +404,7 @@ const BinMap: React.FC<BinMapProps> = ({
     areaPolygonsRef.current = [];
 
     // Collect all bins to display
-    let allBins: { bin: Bin; areaId?: string }[] = [];
+    let allBins: { bin: ExtendedBin; areaId?: string }[] = [];
     
     // Add bins from areas
     if (areas.length > 0) {
@@ -310,18 +425,50 @@ const BinMap: React.FC<BinMapProps> = ({
     // Add loose bins if provided
     if (bins.length > 0) {
       bins.forEach(bin => {
-        allBins.push({ bin });
+        allBins.push({ bin: bin as ExtendedBin });
       });
     }
-
-    // Create bin markers
+    
+    // Add suggestion bins if provided
+    if (suggestionBins && suggestionBins.length > 0) {
+      suggestionBins.forEach(bin => {
+        allBins.push({ bin: { ...bin, isSuggestion: true } as ExtendedBin });
+      });
+    }    // Create bin markers
     binMarkersRef.current = allBins.map(({ bin, areaId }) => {
+      const isSuggestion = (bin as ExtendedBin).isSuggestion || false;
+      
+      // Check if this bin has any reported issues
+      const hasIssue = binsWithIssues.has(bin._id);
+      
       const marker = L.marker(
         [bin.location.coordinates[1], bin.location.coordinates[0]], 
-        { icon: createBinIcon(bin.fillLevel, bin.wasteType, areaId) }
+        { 
+          icon: createBinIcon(
+            bin.fillLevel, 
+            bin.wasteType, 
+            areaId, 
+            isSuggestion,
+            bin._id,
+            hasIssue,
+            bin.status
+          ) 
+        }
       );
       
-      // Add interactions (click, double click)
+      // For suggestion bins, add a special popup with more info
+      if (isSuggestion) {
+        marker.bindPopup(`
+          <div style="min-width: 200px">
+            <h3 style="font-size: 16px; margin-bottom: 5px; font-weight: 600;">Suggested Bin Location</h3>
+            ${bin.address ? `<p style="margin: 5px 0"><strong>Address:</strong> ${bin.address}</p>` : ''}
+            <p style="margin: 5px 0"><strong>Coordinates:</strong> ${bin.location.coordinates[1].toFixed(6)}, ${bin.location.coordinates[0].toFixed(6)}</p>
+            ${(bin as ExtendedBin).reason ? `<p style="margin: 5px 0"><strong>Reason:</strong> ${(bin as ExtendedBin).reason}</p>` : ''}
+          </div>
+        `);
+      }
+      
+      // Add interactions (click, double click) for all bins including suggestions
       addBinMarkerInteractions(marker, bin);
       
       // Add to map
@@ -375,30 +522,7 @@ const BinMap: React.FC<BinMapProps> = ({
         
         areaPolygonsRef.current.push(polygon);
         
-        // Add markers for start and end locations
-        if (area.startLocation && area.startLocation.coordinates) {
-          L.marker([area.startLocation.coordinates[1], area.startLocation.coordinates[0]], {
-            icon: L.divIcon({
-              className: 'start-marker',
-              html: `<div style="width:14px;height:14px;border-radius:50%;background-color:green;border:2px solid white;"></div>`,
-              iconSize: [12, 12],
-              iconAnchor: [6, 6]
-            })
-          })
-          .addTo(mapRef.current!);
-        }
-        
-        if (area.endLocation && area.endLocation.coordinates) {
-          L.marker([area.endLocation.coordinates[1], area.endLocation.coordinates[0]], {
-            icon: L.divIcon({
-              className: 'end-marker',
-              html: `<div style="width:14px;height:14px;border-radius:50%;background-color:blue;border:2px solid white;"></div>`,
-              iconSize: [12, 12],
-              iconAnchor: [6, 6]
-            })
-          })
-          .addTo(mapRef.current!);
-        }
+        // Removed start and end location markers as requested
       }
     });
 
@@ -472,14 +596,15 @@ const BinMap: React.FC<BinMapProps> = ({
     singleArea,
     optimizedRoute, 
     currentSegment, 
-    selectedBin, 
     fitToRoute, 
     fitToCurrentSegment, 
     fitToAreas,
     onBinSelect,
-    onBinDoubleClick, // Add to dependency array
+    onBinDoubleClick,
     areaColors,
-    colorByArea
+    colorByArea,
+    suggestionBins,
+    selectedBin
   ]);
 
   // Add current location marker if provided
@@ -525,7 +650,7 @@ const BinMap: React.FC<BinMapProps> = ({
 
   return (
     <div 
-      id="map-container" 
+      ref={mapContainerRef}
       style={{ 
         height: '600px', 
         width: '100%', 

@@ -50,6 +50,7 @@ import {
   Settings,
 } from "lucide-react";
 import BinMap from "@/components/dashboard/bin-map";
+import RouteMap from "@/components/dashboard/route-map";
 import { 
   getAllAreasWithBins,
   AreaWithBins,
@@ -57,9 +58,7 @@ import {
 } from "@/lib/api/areas";
 import { 
   getOptimizedRoute, 
-  generateCustomRoute, 
   saveRouteSchedule,
-  adjustExistingRoute, 
   OptimizedRoute,
   RouteParameters
 } from "@/lib/api/routes";
@@ -587,7 +586,7 @@ export default function SchedulePage() {
           <Card className="md:col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings size={18} />
+                <Route size={18} />
                 Route Parameters
               </CardTitle>
               <CardDescription>
@@ -716,13 +715,35 @@ export default function SchedulePage() {
                     <SelectValue placeholder="Select collector" />
                   </SelectTrigger>
                   <SelectContent>
-                    {collectors.filter(c => c.status === 'active').map((collector) => (
-                      <SelectItem key={collector._id} value={collector._id}>
-                        {collector.firstName ? `${collector.firstName} ${collector.lastName || ''}` : collector.username}
+                    {collectors
+                      .filter(c => 
+                        // Only show collectors who are:
+                        // 1. Active AND
+                        // 2. Assigned to the current area
+                        c.status === 'active' && 
+                        (c.area?._id === currentRoute.area.id || (typeof c.area === 'string' && c.area === currentRoute.area.id))
+                      )
+                      .map((collector) => (
+                        <SelectItem 
+                          key={collector._id} 
+                          value={collector._id}
+                        >
+                          {collector.firstName ? `${collector.firstName} ${collector.lastName || ''}` : collector.username}
+                        </SelectItem>
+                      ))}
+                    {collectors.filter(c => 
+                      c.status === 'active' && 
+                      (c.area?._id === currentRoute.area.id || (typeof c.area === 'string' && c.area === currentRoute.area.id))
+                    ).length === 0 && (
+                      <SelectItem value="no-collectors" disabled>
+                        No available collectors for this area
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Only showing active collectors assigned to this area
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -860,16 +881,14 @@ export default function SchedulePage() {
                   {/* Map View Tab */}
                   <TabsContent value="map" className="m-0">
                     <div className="h-[500px] rounded-md overflow-hidden">
-                      <BinMap
-                        bins={currentRoute.bins}
-                        optimizedRoute={currentRoute.routePolyline || currentRoute.bins.map(bin => 
-                          [bin.location.coordinates[0], bin.location.coordinates[1]] as [number, number]
-                        )}
+                      <RouteMap
+                        routeBins={currentRoute.bins}
+                        routePolyline={currentRoute.routePolyline}
+                        area={areas.find(area => area.areaID === selectedArea)}
                         onBinSelect={handleBinSelect}
                         selectedBin={selectedBin}
                         style={{ height: "500px" }}
-                        singleArea={areas.find(area => area.areaID === selectedArea)}
-                        fitToRoute={true}
+                        showSequenceNumbers={true}
                       />
                     </div>
                   </TabsContent>
