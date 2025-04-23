@@ -51,6 +51,7 @@ import { format, addDays, subDays, isSameDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import BinMap from "@/components/dashboard/bin-map";
 import RouteMap from "@/components/dashboard/route-map";
+import RouteCreationDialog from "@/components/dashboard/route-creation-dialog";
 import { getAllAreasWithBins, AreaWithBins } from "@/lib/api/areas"; 
 import { 
   getAllSchedules, 
@@ -580,6 +581,9 @@ export default function SchedulePage() {
   const [scheduleToDelete, setScheduleToDelete] = useState<string>("");
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
   
+  // Add state for route creation dialog
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false);
+  
   // Format date for display
   const formattedDate = format(selectedDate, "MMMM d, yyyy");
   const dayOfWeek = format(selectedDate, "EEEE");
@@ -778,7 +782,10 @@ export default function SchedulePage() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button size="sm" onClick={() => router.push("/dashboard/routes")}>
+          <Button 
+            size="sm" 
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Create Schedule
           </Button>
@@ -915,6 +922,14 @@ export default function SchedulePage() {
         onClose={() => setIsDetailsOpen(false)}
         schedule={selectedSchedule}
         onDelete={handleDeleteSchedule}
+      />
+      
+      {/* Route creation dialog */}
+      <RouteCreationDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onRouteCreated={() => fetchDailySchedules(selectedDate)}
+        selectedDate={selectedDate}
       />
     </div>
   );
