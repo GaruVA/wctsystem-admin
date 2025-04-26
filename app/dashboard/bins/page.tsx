@@ -557,7 +557,7 @@ export default function BinManagementPage() {
             onClick={() => setCreateDialogOpen(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add New Bin
+            Add Bin
           </Button>
         </div>
       </div>
@@ -691,7 +691,7 @@ export default function BinManagementPage() {
               </div>
 
               {/* Bins table */}
-              <div className="overflow-x-auto">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

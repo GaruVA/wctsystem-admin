@@ -62,6 +62,7 @@ import {
   AlertCircle,
   MapPin,
   Trophy,
+  RefreshCcw
 } from "lucide-react";
 import { 
   getAllCollectors, 
@@ -106,34 +107,25 @@ export default function CollectorsPage() {
     status: "active"
   });
   
-  // Load collectors on component mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const collectorsData = await getAllCollectors();
-        
-        // Use the actual efficiency values from the backend
-        setCollectors(collectorsData);
-        
-        // Also fetch areas for assigning collectors
-        const areasData = await getAllAreasWithBins();
-        setAreas(areasData.map(area => ({ 
-          areaID: area.areaID, 
-          areaName: area.areaName 
-        })));
-        
-        setError(null);
-      } catch (err) {
-        console.error('Failed to load collectors:', err);
-        setError('Failed to load collectors. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, []);
+  // Fetch collectors and areas
+  const fetchCollectors = async () => {
+    setLoading(true);
+    try {
+      const collectorsData = await getAllCollectors();
+      setCollectors(collectorsData);
+      const areasData = await getAllAreasWithBins();
+      setAreas(areasData.map(a => ({ areaID: a.areaID, areaName: a.areaName })));
+      setError(null);
+    } catch (err) {
+      console.error('Failed to load collectors:', err);
+      setError('Failed to load collectors. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load on mount
+  useEffect(() => { fetchCollectors(); }, []);
   
   // Filter collectors based on search term, status, and active tab
   const filteredCollectors = collectors.filter(collector => {
@@ -380,32 +372,13 @@ export default function CollectorsPage() {
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
-      <h1 className="text-2xl font-bold tracking-tight">Collectors</h1>
-        <div className="flex gap-3">
-          <div className="relative">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search collectors..."
-              className="pl-10 w-64 h-9"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40 h-9">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="on-leave">On Leave</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button size={"sm"} onClick={() => {
-            resetFormData();  // Reset form data before opening the dialog
-            setIsAddDialogOpen(true);
-          }}>
+        <h1 className="text-2xl font-bold tracking-tight">Collectors</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={fetchCollectors}>
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button size="sm" onClick={() => { resetFormData(); setIsAddDialogOpen(true); }}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add Collector
           </Button>
@@ -422,24 +395,15 @@ export default function CollectorsPage() {
       )}
 
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            <span>Collector List</span>
-          </CardTitle>
-          <CardDescription>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              <span>Collector List</span>
+            </CardTitle>
+            <CardDescription>
             Manage waste collection personnel and view performance
-          </CardDescription>
-        </CardHeader>
-
-        <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="px-6">
-          <TabsList>
-            <TabsTrigger value="all">All Collectors</TabsTrigger>
-            <TabsTrigger value="assigned">Assigned</TabsTrigger>
-            <TabsTrigger value="unassigned">Unassigned</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
+            </CardDescription>
+          </CardHeader>
         <CardContent>
           {loading && (
             <div className="flex justify-center py-8">
@@ -469,7 +433,7 @@ export default function CollectorsPage() {
           )}
           
           {!loading && filteredCollectors.length > 0 && (
-            <div className="overflow-x-auto">
+            <div className="rounded-md border overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -591,13 +555,13 @@ export default function CollectorsPage() {
         </CardContent>
       </Card>
 
-      {/* Collector Performance Overview */}
+      {/* Collector Performance */}
       <div className="grid gap-6 grid-cols-1">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              <span>Collector Performance Overview</span>
+              <span>Collector Performance</span>
             </CardTitle>
             <CardDescription>
               Key metrics and insights about waste collection team performance
