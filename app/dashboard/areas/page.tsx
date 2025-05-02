@@ -7,13 +7,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { MapPin, Save, Plus, Trash2, Edit, Map, Info } from "lucide-react"
+import { MapPin, Save, Plus, Trash2, Edit, Map, Info, RefreshCcw } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import AreaBoundaryMap from "@/components/dashboard/area-boundary-map"
 import SuggestionBinMap from "@/components/dashboard/suggestion-bin-map";
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { AreaStatusOverview } from "@/components/dashboard/area-status-overview"
 
 // Interface definitions
 interface Area {
@@ -58,7 +57,6 @@ export default function AreasPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedArea, setSelectedArea] = useState<Area | null>(null);
   const [areaToDelete, setAreaToDelete] = useState<string>("");
-  const [searchTerm, setSearchTerm] = useState<string>("");
 
   const defaultGeometry = {
     type: "Polygon",
@@ -96,15 +94,30 @@ export default function AreasPage() {
       }
 
       const data = await response.json();
-
-      // Simulate additional area statistics that would come from the backend
-      // In a real implementation, these would be provided by the API
-      const enhancedData = data.map((area: Area) => ({
-        ...area,
-        binCount: Math.floor(Math.random() * 50) + 5,
-        collectorCount: Math.floor(Math.random() * 3) + 1,
-        fillRate: Math.floor(Math.random() * 100)
-      }));
+      
+      // Fetch the area analytics data for fill levels
+      const analyticsResponse = await fetch('http://localhost:5000/api/analytics/area-status', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!analyticsResponse.ok) {
+        throw new Error('Failed to fetch area analytics');
+      }
+      
+      const analyticsData = await analyticsResponse.json();
+      
+      // Map the analytics data to the areas
+      const enhancedData = data.map((area: Area) => {
+        const areaAnalytics = analyticsData.find((a: any) => a._id === area._id);
+        return {
+          ...area,
+          fillRate: areaAnalytics?.averageFillLevel || 0,
+          binCount: areaAnalytics?.binCount || 0,
+          criticalBins: areaAnalytics?.criticalBins || 0
+        };
+      });
 
       setAreas(enhancedData);
     } catch (error) {
@@ -118,10 +131,6 @@ export default function AreasPage() {
       setIsLoading(false);
     }
   };
-
-  const filteredAreas = areas.filter(area =>
-    area.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   const handleOpenCreateDialog = () => {
     setAreaForm({
@@ -336,24 +345,17 @@ export default function AreasPage() {
     <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Areas</h1>
-        <div className="flex gap-3">
-          <div className="relative">
-            <Input
-              placeholder="Search areas..."
-              className="w-64 h-9"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Button onClick={handleOpenCreateDialog} size="sm">
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={fetchAreas}>
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button size="sm" onClick={handleOpenCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />
             Add Area
           </Button>
         </div>
       </div>
-
-            {/* Add Area Status Overview at the top */}
-            <AreaStatusOverview />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -373,6 +375,7 @@ export default function AreasPage() {
                   <TableHead>Area Name</TableHead>
                   <TableHead>Start Location</TableHead>
                   <TableHead>End Location</TableHead>
+                  <TableHead>Avg. Fill Level</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -381,18 +384,35 @@ export default function AreasPage() {
                   <TableRow>
                     <TableCell colSpan={6} className="text-center">Loading areas...</TableCell>
                   </TableRow>
-                ) : filteredAreas.length === 0 ? (
+                ) : areas.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center">
-                      {searchTerm ? "No matching areas found" : "No areas found"}
+                      No areas found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredAreas.map((area) => (
+                  areas.map((area) => (
                     <TableRow key={area._id}>
                       <TableCell className="font-medium">{area.name}</TableCell>
                       <TableCell>{formatCoordinates(area.startLocation.coordinates)}</TableCell>
                       <TableCell>{formatCoordinates(area.endLocation.coordinates)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium">{Math.round(area.fillRate || 0)}%</span>
+                            <span className="text-xs text-gray-500">
+                              {area.fillRate && area.fillRate > 80 ? 'Critical' : 
+                               area.fillRate && area.fillRate > 60 ? 'Warning' : 'Normal'}
+                            </span>
+                          </div>
+                          <Progress value={area.fillRate} className="h-2">
+                            <div 
+                              className={`h-full ${getFillLevelColor(area.fillRate)}`} 
+                              style={{ width: `${area.fillRate || 0}%` }}
+                            />
+                          </Progress>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(area)}>

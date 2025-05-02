@@ -22,7 +22,12 @@ import {
   Percent,
   Map,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  Loader2,
+  Recycle,
+  Clock,
+  TrendingUp,
+  BarChart4
 } from "lucide-react";
 import { getAllAreasWithBins, AreaWithBins, Bin } from "@/lib/api/areas";
 import { cn } from "@/lib/utils";
@@ -76,10 +81,17 @@ export default function DashboardPage() {
   const [suggestionsLoading, setSuggestionsLoading] = useState(true);
   const [selectedSuggestion, setSelectedSuggestion] = useState<BinSuggestion | null>(null);
   const [suggestionBins, setSuggestionBins] = useState<Bin[]>([]); // New state for suggestion bins formatted for map
+  const [analytics, setAnalytics] = useState({
+    totalAreas: 0,
+    totalBins: 0,
+    fillLevelTrendToday: 0,
+    collectionsToday: 0
+  });
 
   useEffect(() => {
     fetchAreas();
     fetchAlerts();
+    fetchAnalytics();
   }, []);
 
   const fetchAreas = async () => {
@@ -294,10 +306,44 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      // In a real implementation, this would fetch from the API
+      // For now, we'll use mock data
+      setTimeout(() => {
+        setAnalytics({
+          totalAreas: 2,
+          totalBins: 21,
+          fillLevelTrendToday: 67,
+          collectionsToday: 2
+        });
+        setLoading(false);
+      }, 1000);
+      
+      // This would be the real implementation:
+      // const response = await api.get("/analytics/overview", {
+      //   headers: {
+      //     Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+      //   },
+      // });
+      // setAnalytics(response.data);
+    } catch (err) {
+      console.error('Error fetching analytics data:', err);
+      toast({
+        title: "Error fetching analytics",
+        description: "Could not retrieve the latest analytics data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col">
-      {/* Full-height hero section - 100vh */}
-      <section className="flex flex-col h-screen px-2 pt-2">
+      {/* Fixed-height hero section instead of h-screen */}
+      <section className="flex flex-col h-[900px] px-2 pt-2">
         {/* Fixed-height header section */}
         <div className="flex items-center justify-between p-4 md:p-6">
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
@@ -313,6 +359,7 @@ export default function DashboardPage() {
               onClick={() => {
                 fetchAreas();
                 fetchAlerts();
+                fetchAnalytics();
               }}
               disabled={loading || areasLoading}
             >
@@ -325,9 +372,83 @@ export default function DashboardPage() {
             </Button>
           </div>
         </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-4 md:px-6 mb-4">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Total Areas</p>
+                  <div className="flex items-baseline gap-1">
+                    <h4 className="text-2xl font-bold">
+                      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : analytics.totalAreas}
+                    </h4>
+                  </div>
+                </div>
+                <div className="p-2 bg-purple-100 text-purple-800 rounded-full">
+                  <Map className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Total Bins</p>
+                  <div className="flex items-baseline gap-1">
+                    <h4 className="text-2xl font-bold">
+                      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : analytics.totalBins}
+                    </h4>
+                  </div>
+                </div>
+                <div className="p-2 bg-blue-100 text-blue-800 rounded-full">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Fill Level Trend Today</p>
+                  <div className="flex items-baseline gap-1">
+                    <h4 className="text-2xl font-bold">
+                      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : `${analytics.fillLevelTrendToday}%`}
+                    </h4>
+                  </div>
+                </div>
+                <div className="p-2 bg-amber-100 text-amber-800 rounded-full">
+                  <Percent className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Collections Today</p>
+                  <div className="flex items-baseline gap-1">
+                    <h4 className="text-2xl font-bold">
+                      {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : analytics.collectionsToday}
+                    </h4>
+                  </div>
+                </div>
+                <div className="p-2 bg-green-100 text-green-800 rounded-full">
+                  <Truck className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Map and Alerts container - fills remaining height */}
-        <div className="flex-1 grid gap-4 px-4 pb-4 md:px-6 md:pb-6 md:grid-cols-3">
+        {/* Map and Alerts container - now with fixed height */}
+        <div className="flex-1 grid gap-4 px-4 pb-4 md:px-6 md:pb-6 md:grid-cols-3" style={{ height: '600px' }}>
           {/* Map card - takes 2/3 width on md+ screens */}
           <Card className="col-span-3 md:col-span-2 flex flex-col">
             <CardHeader className="flex-shrink-0">
