@@ -89,13 +89,16 @@ export default function AdminReportsView() {
   const [error, setError] = useState<string | null>(null)
   const [timeRange, setTimeRange] = useState("week")
   const [activeTab, setActiveTab] = useState("overview")
+  const [aiInsights, setAIInsights] = useState<string | null>(null);
+  const [aiLoading, setAILoading] = useState(false);
+  const [aiError, setAIError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchReports()
   }, [timeRange])
 
   const fetchReports = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
       const [
         fillLevelTrendsResponse,
@@ -109,41 +112,73 @@ export default function AdminReportsView() {
         api.get<WasteTypeAnalytics>(`/analytics/waste-type?timeRange=${timeRange}`),
         api.get<AreaStatusOverview[]>(`/analytics/area-status?timeRange=${timeRange}`),
         api.get<CollectionEfficiencyData[]>(`/analytics/collection-efficiency-bin-utilization?timeRange=${timeRange}`),
-      ])
+      ]);
 
-      setFillLevelTrends(fillLevelTrendsResponse.data)
-      setAnalytics(analyticsResponse.data)
-      setWasteTypeAnalytics(wasteTypeAnalyticsResponse.data)
-      setAreaStatusOverview(areaStatusOverviewResponse.data)
-      setCollectionEfficiencyData(collectionEfficiencyResponse.data)
-      setError(null)
+      // Transform fillLevelTrends to match the frontend's needs
+      const transformedTrends = Object.entries(fillLevelTrendsResponse.data).reduce((acc, [areaName, trends]) => {
+        acc[areaName] = trends.map((trend) => ({
+          fillLevel: trend.fillLevel,
+          lastCollected: trend.lastCollected,
+        })).sort((a, b) => new Date(a.lastCollected).getTime() - new Date(b.lastCollected).getTime());
+        return acc;
+      }, {} as FillLevelTrends);
+
+      setFillLevelTrends(transformedTrends);
+      setAnalytics(analyticsResponse.data);
+      setWasteTypeAnalytics(wasteTypeAnalyticsResponse.data);
+      setAreaStatusOverview(areaStatusOverviewResponse.data);
+      setCollectionEfficiencyData(collectionEfficiencyResponse.data);
+      setError(null);
     } catch (err: any) {
-      console.error("Error fetching reports:", err)
-      setError("Failed to fetch reports data. Please check your connection and try again.")
+      console.error("Error fetching reports:", err);
+      setError("Failed to fetch reports data. Please check your connection and try again.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
+  // Function to fetch AI insights
+  const fetchAIInsights = async () => {
+    setAILoading(true);
+    setAIError(null);
+    try {
+      const requestData = {
+        fillLevelTrends,
+        analytics,
+        wasteTypeAnalytics,
+        areaStatusOverview,
+        collectionEfficiencyData,
+      };
+      console.log("Request Data for AI Insights:", requestData); // Debugging
+
+      const response = await api.post<{ insights: string }>("/ai/insights", requestData);
+      setAIInsights(response.data.insights);
+    } catch (err: any) {
+      console.error("Error fetching AI insights:", err);
+      setAIError("Failed to fetch AI insights. Please try again.");
+    } finally {
+      setAILoading(false);
+    }
+  };
+
   // Prepare data for charts
   const fillLevelTrendsData = {
-    labels:
-      Object.keys(fillLevelTrends).length > 0
-        ? fillLevelTrends[Object.keys(fillLevelTrends)[0]].map((bin) =>
-            new Date(bin.lastCollected).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })
-          )
-        : [],
-    datasets: Object.entries(fillLevelTrends).map(([areaName, bins], index) => ({
+    labels: Object.keys(fillLevelTrends).length > 0
+      ? Object.values(fillLevelTrends)[0].map((trend) =>
+          new Date(trend.lastCollected).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })
+        )
+      : [],
+    datasets: Object.keys(fillLevelTrends).map((areaName, index) => ({
       label: areaName,
-      data: bins.map((bin) => bin.fillLevel),
-      borderColor: index === 0 ? "#3b82f6" : index === 1 ? "#10b981" : index === 2 ? "#f59e0b" : "#ef4444",
-      backgroundColor: index === 0 ? "#3b82f6" : index === 1 ? "#10b981" : index === 2 ? "#f59e0b" : "#ef4444",
+      data: fillLevelTrends[areaName].map((trend) => trend.fillLevel),
+      borderColor: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"][index % 4],
+      backgroundColor: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"][index % 4],
       tension: 0.3,
     })),
-  }
+  };
 
   const wasteTypeAnalyticsData = {
     labels: Object.keys(wasteTypeAnalytics),
@@ -195,6 +230,10 @@ export default function AdminReportsView() {
     ],
   }
 
+  console.log("fillLevelTrends:", fillLevelTrends);
+  console.log("Object.keys(fillLevelTrends):", Object.keys(fillLevelTrends));
+  console.log("fillLevelTrends[Object.keys(fillLevelTrends)[0]]:", fillLevelTrends[Object.keys(fillLevelTrends)[0]]);
+
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -231,6 +270,19 @@ export default function AdminReportsView() {
           <Button size="sm">
             <Download className="mr-2 h-4 w-4" />
             Export Reports
+          </Button>
+          <Button onClick={fetchAIInsights} disabled={aiLoading} size="sm">
+            {aiLoading ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Fetching AI Insights...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Generate AI Insights
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -580,6 +632,23 @@ export default function AdminReportsView() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* AI Insights Text Box */}
+      <div className="mt-4">
+        <label htmlFor="ai-insights" className="block text-sm font-medium text-gray-700">
+          AI Insights
+        </label>
+        <textarea
+          id="ai-insights"
+          rows={6}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          value={aiInsights ? JSON.stringify(JSON.parse(aiInsights), null, 2) : ""}
+          onChange={(e) => setAIInsights(e.target.value)} // Allow editing if needed
+          placeholder="AI insights will appear here..."
+          disabled={aiLoading}
+        />
+        {aiError && <p className="mt-2 text-sm text-red-600">{aiError}</p>}
+      </div>
     </div>
-  )
+  );
 }
