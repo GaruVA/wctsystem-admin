@@ -520,7 +520,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Real-time alerts container - takes 1/3 width on md+ screens */}
-          <Card className="col-span-3 md:col-span-1 flex flex-col">
+          <Card className="col-span-3 md:col-span-1 flex flex-col" style={{ height: "662px", maxHeight: "662px", overflowY: "auto" }}>
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
