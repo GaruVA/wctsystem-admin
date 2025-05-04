@@ -34,6 +34,7 @@ import { getAllSchedules, Schedule } from "@/lib/api/schedules";
 import { cn } from "@/lib/utils";
 import { getUnreadAlerts, Alert, AlertSeverity, AlertType, markAsRead, markAllAsRead } from "@/lib/api/alerts";
 import { toast } from "@/components/ui/use-toast";
+import { format } from "date-fns";
 
 
 
@@ -90,9 +91,13 @@ export default function DashboardPage() {
     fetchAnalytics();
     // Fetch today's schedules
     const fetchTodays = async () => {
-      const dateString = new Date().toISOString().split('T')[0];
+      // Use the same date format method as in schedules page
+      const today = new Date();
+      const dateString = format(today, "yyyy-MM-dd");
       try {
+        console.log('Fetching schedules for today:', dateString);
         const schedules = await getAllSchedules({ date: dateString });
+        console.log('Found schedules:', schedules.length);
         setTodaysRoutes(schedules.map(s => ({ _id: s._id, route: s.route })));
       } catch (err) {
         console.error('Error fetching today\'s schedules:', err);
