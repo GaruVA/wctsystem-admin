@@ -8,25 +8,9 @@ import { AreaWithBins, Bin } from '../../lib/api/areas';
 // Define interfaces for the component
 interface BinMapProps {
   areas?: AreaWithBins[];
-  singleArea?: AreaWithBins;
-  bins?: Bin[];
-  optimizedRoute?: [number, number][];
-  fitToRoute?: boolean;
-  routeBins?: Bin[];
-  currentSegment?: [number, number][];
-  fitToCurrentSegment?: boolean;
   fitToAreas?: boolean;
-  currentLocation?: {
-    latitude: number;
-    longitude: number;
-  };
-  onBinSelect?: (bin: Bin | null) => void;
-  onBinDoubleClick?: (bin: Bin) => void; // Add double click handler
-  selectedBin?: Bin | null;
+  todaysRoutes?: Array<{ _id: string; route: [number, number][] }>;
   style?: React.CSSProperties;
-  colorByArea?: boolean;
-  suggestionBins?: Bin[]; // Add prop for suggestion bins
-  binsWithIssues?: Set<string>; // Add prop for tracking bins with issues
 }
 
 // Extend the Bin type to include suggestion-specific properties
@@ -38,35 +22,20 @@ interface ExtendedBin extends Bin {
 
 const BinMap: React.FC<BinMapProps> = ({
   areas = [],
-  singleArea,
-  bins = [],
-  optimizedRoute = [],
-  fitToRoute = false,
-  routeBins = [],
-  currentSegment = [],
-  fitToCurrentSegment = false,
   fitToAreas = true,
-  currentLocation,
-  onBinSelect,
-  onBinDoubleClick,
-  selectedBin = null,
   style,
-  colorByArea = true,
-  suggestionBins = [], // Add default empty array for suggestion bins
-  binsWithIssues = new Set() // Add default empty Set for bins with issues
+  todaysRoutes = []
 }) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const binMarkersRef = useRef<L.Marker[]>([]);
-  const routePolylineRef = useRef<L.Polyline | null>(null);
-  const currentSegmentPolylineRef = useRef<L.Polyline | null>(null);
   const areaPolygonsRef = useRef<L.Polygon[]>([]);
   const mapInitializedRef = useRef<boolean>(false);
   const [areaColors, setAreaColors] = useState<Map<string, string>>(new Map());
 
   // Generate unique colors for areas
   useEffect(() => {
-    if (areas.length > 0 && colorByArea) {
+    if (areas.length > 0) {
       const colors = new Map<string, string>();
       // Predefined colors for better visibility
       const colorPalette = [
@@ -80,7 +49,8 @@ const BinMap: React.FC<BinMapProps> = ({
 
       setAreaColors(colors);
     }
-  }, [areas, colorByArea]);
+  }, [areas]);
+
   // Custom icon for bins
   const createBinIcon = (
     fillLevel: number, 
@@ -222,442 +192,142 @@ const BinMap: React.FC<BinMapProps> = ({
     });
   };
 
+  // Add start and end marker creators for routes
+  const createStartLocationMarker = () => L.divIcon({
+    className: 'start-marker',
+    html: `<div style="width:14px;height:14px;border-radius:50%;background-color:green;border:2px solid white;"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6]
+  });
+
+  const createEndLocationMarker = () => L.divIcon({
+    className: 'end-marker',
+    html: `<div style="width:14px;height:14px;border-radius:50%;background-color:blue;border:2px solid white;"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6]
+  });
+
   // Add legend to the map
   const addLegend = () => {
     if (!mapRef.current) return;
-    
-    // Remove existing legend if any
     const existingLegend = document.querySelector('.map-legend');
     if (existingLegend) existingLegend.remove();
-    
-    // Create legend control
     const legend = new L.Control({ position: 'bottomright' });
-    
     legend.onAdd = () => {
       const div = L.DomUtil.create('div', 'map-legend');
       div.innerHTML = `
-        <div style="
-          background: white;
-          padding: 10px;
-          border-radius: 5px;
-          box-shadow: 0 0 5px rgba(0,0,0,0.2);
-        ">
-          <div style="font-weight: bold; margin-bottom: 5px;">Fill Level</div>
-          <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 15px; height: 15px; background-color: #10B981; border-radius: 2px; margin-right: 5px;"></div>
-            <span>< 50% - Low</span>
+        <div style="background:white;padding:10px;border-radius:5px;box-shadow:0 0 5px rgba(0,0,0,0.2)">
+          <div style="font-weight:bold;margin-bottom:5px;">Fill Level</div>
+          <div style="display:flex;align-items:center;margin-bottom:3px;">
+            <span style="display:inline-block;width:12px;height:12px;background:#10B981;border-radius:50%;margin-right:5px;"></span>
+            <span>&lt;50% Full (Low)</span>
           </div>
-          <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 15px; height: 15px; background-color: #FBBF24; border-radius: 2px; margin-right: 5px;"></div>
-            <span>50-70% - Medium</span>
+          <div style="display:flex;align-items:center;margin-bottom:3px;">
+            <span style="display:inline-block;width:12px;height:12px;background:#FBBF24;border-radius:50%;margin-right:5px;"></span>
+            <span>50-70% Full (Medium)</span>
           </div>
-          <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="width: 15px; height: 15px; background-color: #F59E0B; border-radius: 2px; margin-right: 5px;"></div>
-            <span>70-90% - High</span>
+          <div style="display:flex;align-items:center;margin-bottom:3px;">
+            <span style="display:inline-block;width:12px;height:12px;background:#F59E0B;border-radius:50%;margin-right:5px;"></span>
+            <span>70-90% Full (High)</span>
           </div>
-          <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <div style="width: 15px; height: 15px; background-color: #EF4444; border-radius: 2px; margin-right: 5px;"></div>
-            <span>≥ 90% - Critical</span>
+          <div style="display:flex;align-items:center;margin-bottom:10px;">
+            <span style="display:inline-block;width:12px;height:12px;background:#EF4444;border-radius:50%;margin-right:5px;"></span>
+            <span>&gt;90% Full (Critical)</span>
           </div>
-          
-          <div style="font-weight: bold; margin-bottom: 5px;">Bin Status</div>
-          <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="position: relative; width: 15px; height: 15px; margin-right: 5px;">
-              <div style="width: 10px; height: 10px; background-color: #F59E0B; border-radius: 50%; font-size: 8px; color: white; text-align: center; line-height: 10px; font-weight: bold;">M</div>
-            </div>
+          <div style="font-weight:bold;margin-bottom:5px;">Status</div>
+          <div style="display:flex;align-items:center;margin-bottom:3px;">
+            <div style="width:12px;height:12px;border-radius:50%;background:#F59E0B;margin-right:5px;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;">M</div>
             <span>Maintenance</span>
           </div>
-          <div style="display: flex; align-items: center; margin-bottom: 3px;">
-            <div style="position: relative; width: 15px; height: 15px; margin-right: 5px;">
-              <div style="width: 10px; height: 10px; background-color: #6B7280; border-radius: 50%; font-size: 8px; color: white; text-align: center; line-height: 10px; font-weight: bold;">I</div>
-            </div>
+          <div style="display:flex;align-items:center;margin-bottom:3px;">
+            <div style="width:12px;height:12px;border-radius:50%;background:#6B7280;margin-right:5px;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;">I</div>
             <span>Inactive</span>
           </div>
-          <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <div style="position: relative; width: 15px; height: 15px; margin-right: 5px;">
-              <div style="width: 10px; height: 10px; background-color: #8B5CF6; border-radius: 50%; font-size: 8px; color: white; text-align: center; line-height: 10px; font-weight: bold;">P</div>
-            </div>
+          <div style="display:flex;align-items:center;margin-bottom:10px;">
+            <div style="width:12px;height:12px;border-radius:50%;background:#8B5CF6;margin-right:5px;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;">P</div>
             <span>Pending Installation</span>
           </div>
-          
-          <div style="font-weight: bold; margin-bottom: 5px; margin-top: 10px;">Waste Types</div>
-          <div style="font-size: 11px; margin-top: 3px;">
-            <span class="font-medium">GEN</span> - General
+          <div style="font-weight:bold;margin:10px 0 5px;">Routes</div>
+          <div style="display:flex;align-items:center;margin-bottom:3px;">
+            <div style="width:15px;height:2px;background-color:blue;margin-right:5px;border-radius:1px;background-image:linear-gradient(to right, blue 50%, transparent 50%);background-size:5px 2px;background-repeat:repeat-x;"></div>
+            <span>Route Path</span>
           </div>
-          <div style="font-size: 11px; margin-top: 3px;">
-            <span class="font-medium">ORG</span> - Organic
+          <div style="display:flex;align-items:center;margin-bottom:3px;">
+            <div style="width:12px;height:12px;border-radius:50%;background-color:green;border:2px solid white;margin-right:5px;"></div>
+            <span>Start Location</span>
           </div>
-          <div style="font-size: 11px; margin-top: 3px;">
-            <span class="font-medium">REC</span> - Recycle
-          </div>
-          <div style="font-size: 11px; margin-top: 3px;">
-            <span class="font-medium">HAZ</span> - Hazardous
+          <div style="display:flex;align-items:center;">
+            <div style="width:12px;height:12px;border-radius:50%;background-color:blue;border:2px solid white;margin-right:5px;"></div>
+            <span>End Location</span>
           </div>
         </div>
       `;
       return div;
     };
-    
     legend.addTo(mapRef.current);
   };
 
-  // Initialize map
+  // Initialize map and add legend
   useEffect(() => {
-    if (!mapRef.current && !mapInitializedRef.current && mapContainerRef.current) {
-      // Default to Sri Lanka coordinates if no specific location is provided
-      const map = L.map(mapContainerRef.current, {
-        center: [7.8731, 80.7718], // Sri Lanka center
-        zoom: 9
-      });
-
-      // Add OpenStreetMap tiles
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(map);
-
-      // Add click handler to deselect bin when clicking on the map
-      map.on('click', () => {
-        if (onBinSelect && selectedBin) {
-          onBinSelect(null);
-        }
-      });
-
+    if (!mapRef.current && mapContainerRef.current) {
+      const map = L.map(mapContainerRef.current, { center: [7.8731, 80.7718], zoom: 9 });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
       mapRef.current = map;
-      mapInitializedRef.current = true;
-
-      // Add legend to the map
       addLegend();
     }
-
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        mapInitializedRef.current = false;
-      }
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     };
-  }, [onBinSelect, selectedBin]);
+  }, []);
 
-  // Fit map to coordinates
-  const fitMapToCoordinates = (coordinates: { lat: number; lng: number }[]) => {
-    if (mapRef.current && coordinates.length > 0) {
-      const group = L.featureGroup(
-        coordinates.map(coord => L.marker([coord.lat, coord.lng], { opacity: 0 }))
-      );
-      mapRef.current.fitBounds(group.getBounds());
-
-      // Remove the temporary markers used for bounds calculation
-      group.eachLayer(layer => layer.remove());
-    }
-  };
-
-  // Function to handle bin marker interactions
-  const addBinMarkerInteractions = (marker: L.Marker, bin: Bin) => {
-    // Handle click to select bin or deselect if already selected
-    marker.on('click', () => {
-      if (onBinSelect) {
-        // If this bin is already selected, deselect it by passing null
-        if (selectedBin && selectedBin._id === bin._id) {
-          onBinSelect(null);
-        } else {
-          onBinSelect(bin);
-        }
-      }
-    });
-    
-    // Add double click handler
-    marker.on('dblclick', (e) => {
-      // Stop propagation to prevent map zoom
-      L.DomEvent.stopPropagation(e);
-      
-      if (onBinDoubleClick) {
-        onBinDoubleClick(bin);
-      }
-    });
-  };
-
-  // Handle map fitting and layers based on different modes
+  // Update map layers: bins, areas, and today's routes
   useEffect(() => {
-    if (!mapRef.current || !mapInitializedRef.current) return;
-
-    // Clear previous layers
-    if (binMarkersRef.current.length > 0) {
-      binMarkersRef.current.forEach(marker => {
-        if (mapRef.current) marker.removeFrom(mapRef.current);
-      });
-      binMarkersRef.current = [];
-    }
-
-    if (routePolylineRef.current) {
-      routePolylineRef.current.removeFrom(mapRef.current);
-      routePolylineRef.current = null;
-    }
-
-    if (currentSegmentPolylineRef.current) {
-      currentSegmentPolylineRef.current.removeFrom(mapRef.current);
-      currentSegmentPolylineRef.current = null;
-    }
-
-    areaPolygonsRef.current.forEach(polygon => {
-      if (mapRef.current) polygon.removeFrom(mapRef.current);
-    });
+    if (!mapRef.current) return;
+    // Clear existing layers
+    binMarkersRef.current.forEach(m => m.remove());
+    binMarkersRef.current = [];
+    areaPolygonsRef.current.forEach(p => p.remove());
     areaPolygonsRef.current = [];
 
-    // Collect all bins to display
-    let allBins: { bin: ExtendedBin; areaId?: string }[] = [];
-    
-    // Add bins from areas
-    if (areas.length > 0) {
-      areas.forEach(area => {
-        area.bins.forEach(bin => {
-          allBins.push({ bin, areaId: area.areaID });
-        });
+    // Draw bins for all areas
+    areas.forEach(area => {
+      area.bins.forEach(bin => {
+        const marker = L.marker([bin.location.coordinates[1], bin.location.coordinates[0]], { icon: createBinIcon(bin.fillLevel, bin.wasteType, undefined, false, undefined, false, bin.status) });
+        marker.addTo(mapRef.current!);
       });
-    }
-    
-    // Add bins from singleArea if provided
-    if (singleArea) {
-      singleArea.bins.forEach(bin => {
-        allBins.push({ bin, areaId: singleArea.areaID });
-      });
-    }
-    
-    // Add loose bins if provided
-    if (bins.length > 0) {
-      bins.forEach(bin => {
-        allBins.push({ bin: bin as ExtendedBin });
-      });
-    }
-    
-    // Add suggestion bins if provided
-    if (suggestionBins && suggestionBins.length > 0) {
-      suggestionBins.forEach(bin => {
-        allBins.push({ bin: { ...bin, isSuggestion: true } as ExtendedBin });
-      });
-    }    // Create bin markers
-    binMarkersRef.current = allBins.map(({ bin, areaId }) => {
-      const isSuggestion = (bin as ExtendedBin).isSuggestion || false;
-      
-      // Check if this bin has any reported issues
-      const hasIssue = binsWithIssues.has(bin._id);
-      
-      const marker = L.marker(
-        [bin.location.coordinates[1], bin.location.coordinates[0]], 
-        { 
-          icon: createBinIcon(
-            bin.fillLevel, 
-            bin.wasteType, 
-            areaId, 
-            isSuggestion,
-            bin._id,
-            hasIssue,
-            bin.status
-          ) 
-        }
-      );
-      
-      // For suggestion bins, add a special popup with more info
-      if (isSuggestion) {
-        marker.bindPopup(`
-          <div style="min-width: 200px">
-            <h3 style="font-size: 16px; margin-bottom: 5px; font-weight: 600;">Suggested Bin Location</h3>
-            ${bin.address ? `<p style="margin: 5px 0"><strong>Address:</strong> ${bin.address}</p>` : ''}
-            <p style="margin: 5px 0"><strong>Coordinates:</strong> ${bin.location.coordinates[1].toFixed(6)}, ${bin.location.coordinates[0].toFixed(6)}</p>
-            ${(bin as ExtendedBin).reason ? `<p style="margin: 5px 0"><strong>Reason:</strong> ${(bin as ExtendedBin).reason}</p>` : ''}
-          </div>
-        `);
-      }
-      
-      // Add interactions (click, double click) for all bins including suggestions
-      addBinMarkerInteractions(marker, bin);
-      
-      // Add to map
-      if (mapRef.current) marker.addTo(mapRef.current);
-      
-      return marker;
     });
-
-    // Draw route if provided
-    if (optimizedRoute.length > 0) {
-      const routeCoords = optimizedRoute.map(coord => 
-        L.latLng(coord[1], coord[0])
-      );
-      routePolylineRef.current = L.polyline(routeCoords, {
-        color: 'blue', 
-        weight: 4, 
-        opacity: 0.7
-      }).addTo(mapRef.current);
-    }
-
-    // Draw current segment if provided
-    if (currentSegment.length > 0) {
-      const segmentCoords = currentSegment.map(coord => 
-        L.latLng(coord[1], coord[0])
-      );
-      currentSegmentPolylineRef.current = L.polyline(segmentCoords, {
-        color: 'rgba(0,100,255,0.9)', 
-        weight: 5
-      }).addTo(mapRef.current);
-    }
 
     // Draw area polygons
-    const allAreas = [...areas];
-    if (singleArea) allAreas.push(singleArea);
-    
-    allAreas.forEach((area, index) => {
-      if (area.geometry && area.geometry.coordinates && area.geometry.coordinates[0]) {
-        const areaColor = areaColors.get(area.areaID) || `hsl(${(index * 137) % 360}, 70%, 50%)`;
-        
-        // Convert GeoJSON coordinates to Leaflet format
-        const polygonCoords = area.geometry.coordinates[0].map(coord => 
-          L.latLng(coord[1], coord[0])
-        );
-        
-        const polygon = L.polygon(polygonCoords, {
-          color: areaColor,
-          fillColor: areaColor,
-          fillOpacity: 0.2,
-          weight: 2
-        }).addTo(mapRef.current!);
-        
+    areas.forEach(area => {
+      if (area.geometry?.coordinates?.[0]) {
+        const coords = area.geometry.coordinates[0].map(c => L.latLng(c[1], c[0]));
+        const polygon = L.polygon(coords, { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.1, weight: 1 }).addTo(mapRef.current!);
         areaPolygonsRef.current.push(polygon);
-        
-        // Removed start and end location markers as requested
       }
     });
 
-    // Determine what to fit to on the map
-    if (selectedBin) {
-      fitMapToCoordinates([{
-        lat: selectedBin.location.coordinates[1],
-        lng: selectedBin.location.coordinates[0]
-      }]);
-    } else if (fitToCurrentSegment && currentSegment.length > 0) {
-      const segmentCoords = currentSegment.map(coord => ({
-        lat: coord[1],
-        lng: coord[0]
-      }));
-      fitMapToCoordinates(segmentCoords);
-    } else if (fitToRoute && optimizedRoute.length > 0) {
-      const routeCoords = optimizedRoute.map(coord => ({
-        lat: coord[1],
-        lng: coord[0]
-      }));
-      fitMapToCoordinates(routeCoords);
-    } else if (fitToAreas && allAreas.length > 0) {
-      // Collect all coordinates from all areas to fit the map
-      const allCoords: { lat: number; lng: number }[] = [];
-      
-      allAreas.forEach(area => {
-        // Add area polygon coordinates
-        if (area.geometry && area.geometry.coordinates && area.geometry.coordinates[0]) {
-          area.geometry.coordinates[0].forEach(coord => {
-            allCoords.push({ lat: coord[1], lng: coord[0] });
-          });
-        }
-        
-        // Add bin coordinates
-        area.bins.forEach(bin => {
-          allCoords.push({
-            lat: bin.location.coordinates[1],
-            lng: bin.location.coordinates[0]
-          });
-        });
-        
-        // Add start and end locations
-        if (area.startLocation && area.startLocation.coordinates) {
-          allCoords.push({
-            lat: area.startLocation.coordinates[1],
-            lng: area.startLocation.coordinates[0]
-          });
-        }
-        
-        if (area.endLocation && area.endLocation.coordinates) {
-          allCoords.push({
-            lat: area.endLocation.coordinates[1],
-            lng: area.endLocation.coordinates[0]
-          });
-        }
+    // Draw today's routes
+    todaysRoutes.forEach(schedule => {
+      const coords = schedule.route.map(c => L.latLng(c[1], c[0]));
+      L.polyline(coords, { color: 'blue', weight: 4, opacity: 0.7, dashArray: '5, 10' }).addTo(mapRef.current!);
+      if (coords.length > 0) {
+        L.marker(coords[0], { icon: createStartLocationMarker() }).bindPopup('<strong>Route Start</strong>').addTo(mapRef.current!);
+        const end = coords[coords.length - 1];
+        L.marker(end, { icon: createEndLocationMarker() }).bindPopup('<strong>Route End</strong>').addTo(mapRef.current!);
+      }
+    });
+
+    // Fit map to areas if requested
+    if (fitToAreas && areas.length > 0) {
+      const bounds: L.LatLng[] = [];
+      areas.forEach(area => {
+        area.geometry?.coordinates?.[0]?.forEach(c => bounds.push(L.latLng(c[1], c[0])));
       });
-      
-      if (allCoords.length > 0) {
-        fitMapToCoordinates(allCoords);
-      }
-    } else if (allBins.length > 0) {
-      const binCoords = allBins.map(({ bin }) => ({
-        lat: bin.location.coordinates[1],
-        lng: bin.location.coordinates[0]
-      }));
-      fitMapToCoordinates(binCoords);
+      mapRef.current.fitBounds(L.latLngBounds(bounds), { padding: [50, 50] });
     }
-  }, [
-    bins, 
-    areas,
-    singleArea,
-    optimizedRoute, 
-    currentSegment, 
-    fitToRoute, 
-    fitToCurrentSegment, 
-    fitToAreas,
-    onBinSelect,
-    onBinDoubleClick,
-    areaColors,
-    colorByArea,
-    suggestionBins,
-    selectedBin
-  ]);
+  }, [areas, todaysRoutes, fitToAreas]);
 
-  // Add current location marker if provided
-  useEffect(() => {
-    if (!mapRef.current || !currentLocation) return;
-    
-    const currentLocationMarker = L.marker(
-      [currentLocation.latitude, currentLocation.longitude],
-      {
-        icon: L.divIcon({
-          className: 'current-location-marker',
-          html: `
-            <div style="
-              width: 20px;
-              height: 20px;
-              background-color: blue;
-              border-radius: 50%;
-              border: 2px solid white;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            ">
-              <div style="
-                width: 10px;
-                height: 10px;
-                background-color: white;
-                border-radius: 50%;
-              "></div>
-            </div>
-          `,
-          iconSize: [20, 20],
-          iconAnchor: [10, 10]
-        })
-      }
-    ).addTo(mapRef.current);
-    
-    return () => {
-      if (mapRef.current) {
-        currentLocationMarker.removeFrom(mapRef.current);
-      }
-    };
-  }, [currentLocation]);
-
-  return (
-    <div 
-      ref={mapContainerRef}
-      style={{ 
-        height: '600px', 
-        width: '100%', 
-        ...style 
-      }} 
-    />
-  );
+  return <div ref={mapContainerRef} style={{ ...style, height: '562px', width: '100%' }} />;
 };
 
 export default BinMap;

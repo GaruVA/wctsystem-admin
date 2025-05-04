@@ -30,6 +30,7 @@ import {
   BarChart4
 } from "lucide-react";
 import { getAllAreasWithBins, AreaWithBins, Bin } from "@/lib/api/areas";
+import { getAllSchedules, Schedule } from "@/lib/api/schedules";
 import { cn } from "@/lib/utils";
 import { getUnreadAlerts, Alert, AlertSeverity, AlertType, markAsRead, markAllAsRead } from "@/lib/api/alerts";
 import { toast } from "@/components/ui/use-toast";
@@ -69,11 +70,10 @@ interface BinSuggestion {
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
-  const [selectedBin, setSelectedBin] = useState<Bin | null>(null);
+  const [todaysRoutes, setTodaysRoutes] = useState<Array<{_id: string; route: [number, number][]}>>([]);
   const [areas, setAreas] = useState<AreaWithBins[]>([]);
   const [areasLoading, setAreasLoading] = useState<boolean>(true);
   const [areasError, setAreasError] = useState<string | null>(null);
-  const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [issuesLoading, setIssuesLoading] = useState(true);
@@ -92,6 +92,17 @@ export default function DashboardPage() {
     fetchAreas();
     fetchAlerts();
     fetchAnalytics();
+    // Fetch today's schedules
+    const fetchTodays = async () => {
+      const dateString = new Date().toISOString().split('T')[0];
+      try {
+        const schedules = await getAllSchedules({ date: dateString });
+        setTodaysRoutes(schedules.map(s => ({ _id: s._id, route: s.route })));
+      } catch (err) {
+        console.error('Error fetching today\'s schedules:', err);
+      }
+    };
+    fetchTodays();
   }, []);
 
   const fetchAreas = async () => {
@@ -161,13 +172,8 @@ export default function DashboardPage() {
     }
   };
 
-  const handleBinSelect = (bin: Bin | null) => {
-    setSelectedBin(bin);
-  };
-
-  const filteredAreas = selectedArea
-    ? areas.filter(area => area.areaID === selectedArea)
-    : areas;
+  // Always display all areas
+  const filteredAreas = areas;
 
   const getAlertIcon = (type: string) => {
     switch (type) {
@@ -451,7 +457,7 @@ export default function DashboardPage() {
         {/* Map and Alerts container - now with fixed height */}
         <div className="flex-1 grid gap-4 px-4 pb-4 md:px-6 md:pb-6 md:grid-cols-3" style={{ height: '600px' }}>
           {/* Map card - takes 2/3 width on md+ screens */}
-          <Card className="col-span-3 md:col-span-2 flex flex-col">
+          <Card className="col-span-3 md:col-span-2 flex flex-col h-full">
             <CardHeader className="flex-shrink-0">
               <CardTitle className="flex items-center gap-2">
                 <Map size={18} />
@@ -466,7 +472,7 @@ export default function DashboardPage() {
                 Collection areas with bin locations and boundaries
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-0 flex-1 min-h-0">
+            <CardContent className="p-0 flex-1 min-h-0 h-full">
               {areasLoading && (
                 <div className="flex justify-center items-center h-full">
                   <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
@@ -480,41 +486,13 @@ export default function DashboardPage() {
               )}
 
               {!areasLoading && !areasError && (
-                <div className="flex flex-col h-full">
-                  <div className="mb-4 flex flex-wrap gap-2 px-6 pt-2">
-                    <button
-                      onClick={() => setSelectedArea(null)}
-                      className={`px-3 py-1 text-sm rounded ${selectedArea === null
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 hover:bg-gray-300'
-                      }`}
-                    >
-                      All Areas ({areas.length})
-                    </button>
-
-                    {areas.map(area => (
-                      <button
-                        key={area.areaID}
-                        onClick={() => setSelectedArea(area.areaID)}
-                        className={`px-3 py-1 text-sm rounded ${selectedArea === area.areaID
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                        }`}
-                      >
-                        {area.areaName} ({area.bins.length})
-                      </button>
-                    ))}
-                  </div>
-                    <div className="flex-1 min-h-0">
-                    <BinMap
-                      areas={filteredAreas}
-                      fitToAreas={!selectedSuggestion}
-                      onBinSelect={handleBinSelect}
-                      selectedBin={selectedBin}
-                      style={{ height: "100%" }}
-                      binsWithIssues={binsWithIssues}
-                    />
-                  </div>
+                <div className="flex-1 min-h-0 h-full">
+                  <BinMap
+                    areas={areas}
+                    fitToAreas={true}
+                    todaysRoutes={todaysRoutes}
+                    style={{ height: "100%", width: "100%" }}
+                  />
                 </div>
               )}
             </CardContent>
