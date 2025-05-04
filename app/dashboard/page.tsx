@@ -35,19 +35,7 @@ import { cn } from "@/lib/utils";
 import { getUnreadAlerts, Alert, AlertSeverity, AlertType, markAsRead, markAllAsRead } from "@/lib/api/alerts";
 import { toast } from "@/components/ui/use-toast";
 
-const api = axios.create({
-  baseURL: "http://localhost:5000/api",
-});
 
-interface AnalyticsData {
-  [areaId: string]: {
-    utilization: number;
-    collectionEfficiency: number;
-    serviceDelay: number;
-    bins: number;
-    wasteTypeDistribution: Record<string, number>;
-  };
-}
 
 interface Issue {
   _id: string;
@@ -68,6 +56,14 @@ interface BinSuggestion {
   createdAt: string;
 }
 
+// Define types for dashboard metrics
+interface DashboardMetrics {
+  totalAreas: number;
+  totalBins: number;
+  fillLevelTrendToday: number;
+  collectionsToday: number;
+}
+
 export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [todaysRoutes, setTodaysRoutes] = useState<Array<{_id: string; route: [number, number][]}>>([]);
@@ -81,7 +77,7 @@ export default function DashboardPage() {
   const [suggestionsLoading, setSuggestionsLoading] = useState(true);
   const [selectedSuggestion, setSelectedSuggestion] = useState<BinSuggestion | null>(null);
   const [suggestionBins, setSuggestionBins] = useState<Bin[]>([]); // New state for suggestion bins formatted for map
-  const [analytics, setAnalytics] = useState({
+  const [analytics, setAnalytics] = useState<DashboardMetrics>({
     totalAreas: 0,
     totalBins: 0,
     fillLevelTrendToday: 0,
@@ -225,116 +221,22 @@ export default function DashboardPage() {
     fetchIssues();
   }, []);
 
-  // Create a Set of bin IDs that have issues for easy lookup
-  const binsWithIssues = React.useMemo(() => {
-    const issuesBinIds = new Set<string>();
-    issues.forEach(issue => {
-      if (issue.bin && issue.bin._id) {
-        issuesBinIds.add(issue.bin._id);
-      }
-    });
-    return issuesBinIds;
-  }, [issues]);
-
-  useEffect(() => {
-    const fetchBinSuggestions = async () => {
-      try {
-        setSuggestionsLoading(true);
-        const response = await axios.get<BinSuggestion[]>("http://localhost:5000/api/bin-suggestions", {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
-          },
-        });
-        setBinSuggestions(response.data);
-      } catch (error) {
-        console.error("Error fetching bin suggestions:", error);
-      } finally {
-        setSuggestionsLoading(false);
-      }
-    };
-
-    fetchBinSuggestions();
-  }, []);
-
-  useEffect(() => {
-    // Convert bin suggestions to map-compatible format when they're loaded
-    if (binSuggestions.length > 0) {
-      const formattedSuggestions = binSuggestions.map(suggestion => createSuggestionBin(suggestion));
-      setSuggestionBins(formattedSuggestions);
-    }
-  }, [binSuggestions]);
-
-  // Create suggestion bins for the map when a suggestion is selected
-  const createSuggestionBin = (suggestion: BinSuggestion): any => {
-    return {
-      _id: suggestion._id,
-      name: "Suggested Bin",
-      binID: `suggestion-${suggestion._id}`,
-      location: {
-        type: "Point",
-        coordinates: [suggestion.location.longitude, suggestion.location.latitude]
-      },
-      fillLevel: 0,
-      wasteType: "GENERAL",
-      status: "ACTIVE",
-      lastEmptied: new Date().toISOString(),
-      createdAt: suggestion.createdAt,
-      updatedAt: suggestion.createdAt,
-      address: suggestion.address || "",
-      isSuggestion: true,
-      reason: suggestion.reason
-    };
-  };
-
-  const handleRejectSuggestion = async (suggestionId: string) => {
-    try {
-      await axios.delete(`http://localhost:5000/api/bin-suggestions/${suggestionId}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
-        },
-      });
-      
-      // Remove the rejected suggestion from state
-      setBinSuggestions(prev => prev.filter(suggestion => suggestion._id !== suggestionId));
-      
-      // Show success toast
-      toast({
-        title: "Suggestion rejected",
-        description: "The bin suggestion has been removed.",
-        variant: "default",
-      });
-    } catch (error) {
-      console.error("Error rejecting bin suggestion:", error);
-      toast({
-        title: "Error",
-        description: "Failed to reject bin suggestion. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      // In a real implementation, this would fetch from the API
-      // For now, we'll use mock data
-      setTimeout(() => {
-        setAnalytics({
-          totalAreas: 2,
-          totalBins: 21,
-          fillLevelTrendToday: 67,
-          collectionsToday: 2
-        });
-        setLoading(false);
-      }, 1000);
-      
-      // This would be the real implementation:
-      // const response = await api.get("/analytics/overview", {
-      //   headers: {
-      //     Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
-      //   },
-      // });
-      // setAnalytics(response.data);
+      // Fetch real data from the API with proper type assertion
+      const response = await axios.get<DashboardMetrics>("http://localhost:5000/api/analytics/dashboard-metrics", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`
+        }
+      });
+      console.log('Analytics data:', response.data);
+      setAnalytics({
+        totalAreas: response.data.totalAreas,
+        totalBins: response.data.totalBins,
+        fillLevelTrendToday: response.data.fillLevelTrendToday,
+        collectionsToday: response.data.collectionsToday
+      });
     } catch (err) {
       console.error('Error fetching analytics data:', err);
       toast({
