@@ -214,7 +214,12 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchIssues = async () => {
       try {
-        const response = await axios.get<Issue[]>("http://localhost:5000/api/issue");
+        const response = await axios.get<Issue[]>("http://localhost:5000/api/issues", {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("adminToken")}`
+          }
+        });
+        
         setIssues(response.data);
       } catch (error) {
         console.error("Error fetching issues:", error);
