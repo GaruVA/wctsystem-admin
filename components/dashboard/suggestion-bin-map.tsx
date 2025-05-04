@@ -165,6 +165,7 @@ const SuggestionBinMap: React.FC<SuggestionBinMapProps> = ({
           <div style="min-width: 200px">
             <h3 style="font-size: 16px; margin-bottom: 5px; font-weight: 600;">Suggested Bin Location</h3>
             ${bin.address ? `<p style="margin: 5px 0"><strong>Address:</strong> ${bin.address}</p>` : ''}
+            <p style="margin: 5px 0"><strong>Waste Type:</strong> ${bin.wasteType}</p>
             <p style="margin: 5px 0"><strong>Coordinates:</strong> ${bin.location.coordinates[1].toFixed(6)}, ${bin.location.coordinates[0].toFixed(6)}</p>
             ${(bin as SuggestionBin).reason ? `<p style="margin: 5px 0"><strong>Reason:</strong> ${(bin as SuggestionBin).reason}</p>` : ''}
           </div>

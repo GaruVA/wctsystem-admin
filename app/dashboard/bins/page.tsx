@@ -2,18 +2,18 @@
 
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription
 } from "@/components/ui/card";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
@@ -21,19 +21,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
-  Trash2, 
-  Edit, 
-  Plus, 
-  Map, 
+import {
+  Trash2,
+  Edit,
+  Plus,
+  Map,
   RefreshCcw,
   Check,
   X,
@@ -62,6 +62,7 @@ interface Bin {
 interface BinSuggestion {
   _id: string;
   reason: string;
+  binType: string;
   location: {
     longitude: number;
     latitude: number;
@@ -76,13 +77,13 @@ const formatRelativeTime = (dateString: string) => {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.round(diffMs / 60000);
-  
+
   if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
-  
+
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-  
+
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
 };
@@ -96,7 +97,7 @@ export default function BinManagementPage() {
   const [areas, setAreas] = useState<AreaWithBins[]>([]);
   const [areasLoading, setAreasLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Pagination and filtering states
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -104,7 +105,7 @@ export default function BinManagementPage() {
   const [filterFillLevel, setFilterFillLevel] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
   const itemsPerPage = 5;
-  
+
   // State for CRUD operations
   const [createDialogOpen, setCreateDialogOpen] = useState<boolean>(false);
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
@@ -112,14 +113,14 @@ export default function BinManagementPage() {
   const [viewMapDialogOpen, setViewMapDialogOpen] = useState<boolean>(false);
   const [currentBin, setCurrentBin] = useState<Bin | null>(null);
   const [currentSuggestion, setCurrentSuggestion] = useState<BinSuggestion | null>(null);
-  
+
   // Form states for new bin
   const [newBinWasteType, setNewBinWasteType] = useState<string>("GENERAL");
   const [newBinLatitude, setNewBinLatitude] = useState<string>("");
   const [newBinLongitude, setNewBinLongitude] = useState<string>("");
   const [selectedAreaId, setSelectedAreaId] = useState<string>("");
   const [newBinStatus, setNewBinStatus] = useState<string>("PENDING_INSTALLATION");
-  
+
   // Form states for edit dialog
   const [editWasteType, setEditWasteType] = useState<string>("");
   const [editAreaId, setEditAreaId] = useState<string>("");
@@ -132,8 +133,8 @@ export default function BinManagementPage() {
     fetchBins();
     fetchBinSuggestions();
     fetchAreas();
-  }, []); 
-  
+  }, []);
+
   // Fetch bins from API
   const fetchBins = async () => {
     try {
@@ -203,7 +204,7 @@ export default function BinManagementPage() {
     // Parse coordinates and validate
     const lat = parseFloat(newBinLatitude);
     const lng = parseFloat(newBinLongitude);
-    
+
     if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
       toast({
         title: "Invalid coordinates",
@@ -266,7 +267,7 @@ export default function BinManagementPage() {
             type: "Point",
             coordinates: [suggestion.location.longitude, suggestion.location.latitude]
           },
-          wasteType: "GENERAL", // Default waste type
+          wasteType: suggestion.binType.toUpperCase(), // Default waste type
           status: "PENDING_INSTALLATION", // Set default status to pending installation
           notes: suggestion.reason, // Store the suggestion reason as notes
           address: suggestion.address || undefined // Use address if available
@@ -341,7 +342,7 @@ export default function BinManagementPage() {
   const formatBinStatus = (status: string) => {
     return status.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
   };
-  
+
   // Get color for bin status badge
   const getBinStatusColor = (status: string) => {
     switch (status) {
@@ -390,7 +391,7 @@ export default function BinManagementPage() {
     if (editLatitude && editLongitude) {
       const lat = parseFloat(editLatitude);
       const lng = parseFloat(editLongitude);
-      
+
       if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
         toast({
           title: "Invalid coordinates",
@@ -403,19 +404,19 @@ export default function BinManagementPage() {
 
     try {
       const updates: any = {};
-      
+
       if (editWasteType) {
         updates.wasteType = editWasteType;
       }
-      
+
       if (editAreaId) {
         updates.area = editAreaId === "_none" ? null : editAreaId;
       }
-      
+
       if (editStatus) {
         updates.status = editStatus;
       }
-      
+
       // Add location update if coordinates were edited
       if (editLatitude && editLongitude) {
         updates.location = {
@@ -423,7 +424,7 @@ export default function BinManagementPage() {
           coordinates: [parseFloat(editLongitude), parseFloat(editLatitude)]
         };
       }
-      
+
       // Use direct-update endpoint which expects the binId in the request body
       await axios.post(
         `http://localhost:5000/api/bins/direct-update`,
@@ -496,13 +497,13 @@ export default function BinManagementPage() {
   // Handle filtering and pagination
   const filteredBins = bins.filter((bin) => {
     // Filter by search term (check ID and address)
-    const searchMatch = !searchTerm || 
+    const searchMatch = !searchTerm ||
       bin._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (bin.address && bin.address.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+
     // Filter by waste type
     const wasteTypeMatch = !filterWasteType || filterWasteType === "all_types" || bin.wasteType === filterWasteType;
-    
+
     // Filter by fill level
     let fillLevelMatch = true;
     if (filterFillLevel === "high") {
@@ -513,7 +514,7 @@ export default function BinManagementPage() {
       fillLevelMatch = bin.fillLevel < 30;
     }
     // "all_levels" will keep fillLevelMatch as true
-    
+
     // Filter by status
     const statusMatch = !filterStatus || filterStatus === "all_statuses" || bin.status === filterStatus;
 
@@ -524,7 +525,7 @@ export default function BinManagementPage() {
   const totalPages = Math.ceil(filteredBins.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedBins = filteredBins.slice(startIndex, startIndex + itemsPerPage);
-  
+
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
@@ -739,7 +740,7 @@ export default function BinManagementPage() {
                           <Progress value={bin.fillLevel} className="h-1 mt-1" />
                         </TableCell>
                         <TableCell>
-                          <Badge 
+                          <Badge
                             className={getBinStatusColor(bin.status || 'ACTIVE')}
                           >
                             {formatBinStatus(bin.status || 'ACTIVE')}
@@ -789,7 +790,7 @@ export default function BinManagementPage() {
                         <path fillRule="evenodd" d="M12.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L8.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
                       </svg>
                     </Button>
-                    
+
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                       // Show only a window of pages around the current page
                       if (
@@ -816,7 +817,7 @@ export default function BinManagementPage() {
                       }
                       return null;
                     })}
-                    
+
                     <Button
                       variant="outline"
                       size="icon"
@@ -869,7 +870,7 @@ export default function BinManagementPage() {
             </div>
           ) : (
             <div>
-              
+
               {/* Layout changed to flex with map taking 2/3 and list 1/3 */}
               <div className="flex flex-col md:flex-row gap-4">
                 {/* Map showing all suggestion locations - now 2/3 width */}
@@ -905,15 +906,14 @@ export default function BinManagementPage() {
                     }}
                   />
                 </div>
-                
+
                 {/* List of suggestions with improved layout - now 1/3 width */}
                 <div className="md:w-1/3 space-y-4 max-h-[400px] overflow-y-auto pr-2">
                   {binSuggestions.map((suggestion) => (
                     <div
                       key={suggestion._id}
-                      className={`flex items-start gap-3 p-3 border rounded-md shadow-sm bg-white mb-2 hover:shadow-md transition-shadow cursor-pointer ${
-                        currentSuggestion && currentSuggestion._id === suggestion._id ? 'border-blue-500 bg-blue-50' : ''
-                      }`}
+                      className={`flex items-start gap-3 p-3 border rounded-md shadow-sm bg-white mb-2 hover:shadow-md transition-shadow cursor-pointer ${currentSuggestion && currentSuggestion._id === suggestion._id ? 'border-blue-500 bg-blue-50' : ''
+                        }`}
                       onClick={() => {
                         if (currentSuggestion && currentSuggestion._id === suggestion._id) {
                           setCurrentSuggestion(null);
@@ -926,8 +926,8 @@ export default function BinManagementPage() {
                         <Map size={16} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-xs font-medium text-gray-800 truncate">
-                          {suggestion.address || `Location: ${suggestion.location.latitude.toFixed(6)}, ${suggestion.location.longitude.toFixed(6)}`}
+                        <h3 className="text-sm font-medium text-gray-800 truncate">
+                          {`${suggestion.address || `Location: ${suggestion.location.latitude.toFixed(6)}, ${suggestion.location.longitude.toFixed(6)}`} | ${suggestion.binType.toUpperCase()}`}
                         </h3>
                         <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
                           {suggestion.reason}
@@ -937,8 +937,8 @@ export default function BinManagementPage() {
                         </p>
                       </div>
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="ghost"
                           className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
                           onClick={() => handleApproveSuggestion(suggestion)}
@@ -946,8 +946,8 @@ export default function BinManagementPage() {
                         >
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="ghost"
                           className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                           onClick={() => handleRejectSuggestion(suggestion._id)}
@@ -1016,7 +1016,7 @@ export default function BinManagementPage() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="area" className="text-right">
                 Area
-              </Label>              
+              </Label>
               <Select
                 value={selectedAreaId}
                 onValueChange={setSelectedAreaId}
@@ -1036,7 +1036,7 @@ export default function BinManagementPage() {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Latitude</Label>
-              <Input 
+              <Input
                 value={newBinLatitude}
                 onChange={(e) => setNewBinLatitude(e.target.value)}
                 placeholder="Enter latitude"
@@ -1045,7 +1045,7 @@ export default function BinManagementPage() {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Longitude</Label>
-              <Input 
+              <Input
                 value={newBinLongitude}
                 onChange={(e) => setNewBinLongitude(e.target.value)}
                 placeholder="Enter longitude"
@@ -1098,8 +1098,8 @@ export default function BinManagementPage() {
             </Button>
             {currentSuggestion && (
               <div className="flex gap-2">
-                <Button 
-                  variant="default" 
+                <Button
+                  variant="default"
                   className="bg-green-600 hover:bg-green-700"
                   onClick={() => {
                     if (currentSuggestion) {
@@ -1111,7 +1111,7 @@ export default function BinManagementPage() {
                   <Check className="h-4 w-4 mr-1" />
                   Approve
                 </Button>
-                <Button 
+                <Button
                   variant="destructive"
                   onClick={() => {
                     if (currentSuggestion) {
@@ -1200,7 +1200,7 @@ export default function BinManagementPage() {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Latitude</Label>
-              <Input 
+              <Input
                 value={editLatitude}
                 onChange={(e) => setEditLatitude(e.target.value)}
                 placeholder="Enter latitude"
@@ -1209,7 +1209,7 @@ export default function BinManagementPage() {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Longitude</Label>
-              <Input 
+              <Input
                 value={editLongitude}
                 onChange={(e) => setEditLongitude(e.target.value)}
                 placeholder="Enter longitude"
