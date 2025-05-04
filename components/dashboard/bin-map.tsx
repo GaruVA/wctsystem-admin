@@ -309,7 +309,7 @@ const BinMap: React.FC<BinMapProps> = ({
     // Draw today's routes
     todaysRoutes.forEach(schedule => {
       const coords = schedule.route.map(c => L.latLng(c[1], c[0]));
-      L.polyline(coords, { color: 'blue', weight: 4, opacity: 0.7, dashArray: '5, 10' }).addTo(mapRef.current!);
+      L.polyline(coords, { color: 'blue', weight: 4, opacity: 0.7, dashArray: '10, 5' }).addTo(mapRef.current!);
       if (coords.length > 0) {
         L.marker(coords[0], { icon: createStartLocationMarker() }).bindPopup('<strong>Route Start</strong>').addTo(mapRef.current!);
         const end = coords[coords.length - 1];

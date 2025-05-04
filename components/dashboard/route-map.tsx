@@ -454,7 +454,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
         color: 'blue',
         weight: 4,
         opacity: 0.7,
-        dashArray: '5, 10' // Make the route line dashed
+        dashArray: '10, 5' // Make the route line dashed
       }).addTo(mapRef.current!);
 
       // Add markers for start and end of the route
