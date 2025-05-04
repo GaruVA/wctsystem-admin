@@ -20,6 +20,14 @@ interface ExtendedBin extends Bin {
   status?: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE' | 'PENDING_INSTALLATION';
 }
 
+// Fill level color helper
+const getFillLevelColor = (level: number) => {
+  if (level >= 90) return '#EF4444';
+  if (level >= 70) return '#F59E0B';
+  if (level >= 50) return '#FBBF24';
+  return '#10B981';
+};
+
 const BinMap: React.FC<BinMapProps> = ({
   areas = [],
   fitToAreas = true,
@@ -61,14 +69,6 @@ const BinMap: React.FC<BinMapProps> = ({
     hasIssue?: boolean,
     status?: string
   ) => {
-    // Fill level colors (primary color indicator)
-    const getFillLevelColor = (level: number) => {
-      if (level >= 90) return '#EF4444'; // Red
-      if (level >= 70) return '#F59E0B'; // Orange
-      if (level >= 50) return '#FBBF24'; // Yellow
-      return '#10B981'; // Green
-    };
-
     // Get status indicator color and style
     const getStatusIndicator = (status?: string) => {
       switch(status) {
@@ -301,7 +301,9 @@ const BinMap: React.FC<BinMapProps> = ({
     areas.forEach(area => {
       if (area.geometry?.coordinates?.[0]) {
         const coords = area.geometry.coordinates[0].map(c => L.latLng(c[1], c[0]));
-        const polygon = L.polygon(coords, { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.1, weight: 1 }).addTo(mapRef.current!);
+        const avgFill = area.bins.length > 0 ? area.bins.reduce((sum, b) => sum + b.fillLevel, 0) / area.bins.length : 0;
+        const fillColor = getFillLevelColor(avgFill);
+        const polygon = L.polygon(coords, { color: fillColor, fillColor, fillOpacity: 0.2, weight: 1 }).addTo(mapRef.current!);
         areaPolygonsRef.current.push(polygon);
       }
     });
