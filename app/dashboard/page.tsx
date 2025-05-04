@@ -25,7 +25,7 @@ import {
   AlertTriangle,
   Loader2,
   Recycle,
-  Clock,
+  CalendarClock,
   TrendingUp,
   BarChart4
 } from "lucide-react";
@@ -174,6 +174,7 @@ export default function DashboardPage() {
       case AlertType.BIN_FILL_LEVEL: return <Trash2 className="h-5 w-5" />;
       case AlertType.AREA_FILL_LEVEL: return <Map className="h-5 w-5" />;
       case AlertType.MISSED_COLLECTION: return <Truck className="h-5 w-5" />;
+      case AlertType.AUTO_SCHEDULE: return <CalendarClock className="h-5 w-5" />;
       default: return <AlertTriangle className="h-5 w-5" />;
     }
   };

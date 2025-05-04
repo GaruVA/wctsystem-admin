@@ -5,7 +5,8 @@ const API_URL = 'http://localhost:5000/api';
 export enum AlertType {
   BIN_FILL_LEVEL = 'BIN_FILL_LEVEL',
   AREA_FILL_LEVEL = 'AREA_FILL_LEVEL',
-  MISSED_COLLECTION = 'MISSED_COLLECTION'
+  MISSED_COLLECTION = 'MISSED_COLLECTION',
+  AUTO_SCHEDULE = 'AUTO_SCHEDULE'
 }
 
 export enum AlertSeverity {
