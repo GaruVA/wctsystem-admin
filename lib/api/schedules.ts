@@ -33,6 +33,7 @@ export interface Schedule {
   duration: number;
   createdAt: string;
   updatedAt: string;
+  wasteType?: string; // Added waste type field
 }
 
 /**
@@ -51,6 +52,7 @@ export interface ScheduleData {
   distance: number;
   duration: number;
   binSequence: string[];
+  wasteType?: string; // Added waste type field
 }
 
 /**

@@ -67,10 +67,10 @@ import {
 } from "@/lib/api/areas";
 import {
     getOptimizedRoute,
-    saveRouteSchedule,
     OptimizedRoute,
     RouteParameters
 } from "@/lib/api/routes";
+import { createSchedule, ScheduleData } from "@/lib/api/schedules";
 import { getAllCollectors, getActiveCollectors } from "@/lib/api/collectors";
 import { Collector } from "@/lib/types/collector";
 import { cn } from "@/lib/utils";
@@ -435,7 +435,7 @@ export default function RouteCreationDialog({
 
         try {
             // Prepare schedule data matching the createSchedule endpoint structure
-            const scheduleData = {
+            const scheduleData: ScheduleData = {
                 name: currentRoute.name,
                 areaId: currentRoute.area.id,
                 collectorId: selectedCollector, // Use the selected collector ID
@@ -446,8 +446,9 @@ export default function RouteCreationDialog({
                 ).toISOString(),
                 status: "scheduled",
                 notes: notes,
+                wasteType: wasteTypeFilter, // Add waste type from the filter selection
                 // Route data properties that match the backend Schedule model
-                route: currentRoute.routePolyline, // Send the coordinates as 'route'
+                route: currentRoute.routePolyline || [], // Provide default empty array if undefined
                 distance: currentRoute.totalDistance, // Send distance value directly 
                 duration: currentRoute.estimatedDuration, // Send duration value directly
                 binSequence: currentRoute.bins.map(bin => bin._id) // Send bin IDs in sequence
@@ -456,7 +457,7 @@ export default function RouteCreationDialog({
             console.log("Saving route with data:", scheduleData);
 
             // Save the route
-            await saveRouteSchedule(scheduleData);
+            await createSchedule(scheduleData);
 
             // Success message
             setEditMode(false);
