@@ -118,12 +118,10 @@ export default function BinManagementPage() {
   const [newBinWasteType, setNewBinWasteType] = useState<string>("GENERAL");
   const [newBinLatitude, setNewBinLatitude] = useState<string>("");
   const [newBinLongitude, setNewBinLongitude] = useState<string>("");
-  const [selectedAreaId, setSelectedAreaId] = useState<string>("");
   const [newBinStatus, setNewBinStatus] = useState<string>("PENDING_INSTALLATION");
 
   // Form states for edit dialog
   const [editWasteType, setEditWasteType] = useState<string>("");
-  const [editAreaId, setEditAreaId] = useState<string>("");
   const [editStatus, setEditStatus] = useState<string>("");
   const [editLatitude, setEditLatitude] = useState<string>("");
   const [editLongitude, setEditLongitude] = useState<string>("");
@@ -223,8 +221,7 @@ export default function BinManagementPage() {
             coordinates: [lng, lat] // API expects [longitude, latitude]
           },
           wasteType: newBinWasteType,
-          status: newBinStatus,
-          area: selectedAreaId === "_none" ? undefined : selectedAreaId || undefined
+          status: newBinStatus
         },
         {
           headers: {
@@ -243,7 +240,6 @@ export default function BinManagementPage() {
       setNewBinLongitude("");
       setNewBinWasteType("GENERAL");
       setNewBinStatus("PENDING_INSTALLATION");
-      setSelectedAreaId("");
       setCreateDialogOpen(false);
       fetchBins();
     } catch (error) {
@@ -377,7 +373,6 @@ export default function BinManagementPage() {
     // Initialize edit form with current values
     setEditWasteType(bin.wasteType || "");
     setEditStatus(bin.status || "");
-    setEditAreaId(bin.area || "");
     setEditLatitude(bin.location.coordinates[1].toString());
     setEditLongitude(bin.location.coordinates[0].toString());
     setEditDialogOpen(true);
@@ -407,10 +402,6 @@ export default function BinManagementPage() {
 
       if (editWasteType) {
         updates.wasteType = editWasteType;
-      }
-
-      if (editAreaId) {
-        updates.area = editAreaId === "_none" ? null : editAreaId;
       }
 
       if (editStatus) {
@@ -448,7 +439,6 @@ export default function BinManagementPage() {
       setEditLatitude("");
       setEditLongitude("");
       setEditWasteType("");
-      setEditAreaId("");
       setEditStatus("");
       setEditDialogOpen(false);
       fetchBins();
@@ -870,7 +860,6 @@ export default function BinManagementPage() {
             </div>
           ) : (
             <div>
-
               {/* Layout changed to flex with map taking 2/3 and list 1/3 */}
               <div className="flex flex-col md:flex-row gap-4">
                 {/* Map showing all suggestion locations - now 2/3 width */}
@@ -1014,27 +1003,6 @@ export default function BinManagementPage() {
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="area" className="text-right">
-                Area
-              </Label>
-              <Select
-                value={selectedAreaId}
-                onValueChange={setSelectedAreaId}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select area (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_none">None</SelectItem>
-                  {areas.map((area) => (
-                    <SelectItem key={area.areaID} value={area.areaID}>
-                      {area.areaName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Latitude</Label>
               <Input
                 value={newBinLatitude}
@@ -1174,27 +1142,6 @@ export default function BinManagementPage() {
                   <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
                   <SelectItem value="INACTIVE">Inactive</SelectItem>
                   <SelectItem value="PENDING_INSTALLATION">Pending Installation</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-area" className="text-right">
-                Area
-              </Label>
-              <Select
-                value={editAreaId}
-                onValueChange={setEditAreaId}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select area (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_none">None</SelectItem>
-                  {areas.map((area) => (
-                    <SelectItem key={area.areaID} value={area.areaID}>
-                      {area.areaName}
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>
