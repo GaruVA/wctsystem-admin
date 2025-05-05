@@ -27,7 +27,11 @@ import {
   Recycle,
   CalendarClock,
   TrendingUp,
-  BarChart4
+  BarChart4,
+  CheckCircle2,
+  ImageIcon,
+  Clock,
+  RotateCcw
 } from "lucide-react";
 import { getAllAreasWithBins, AreaWithBins, Bin } from "@/lib/api/areas";
 import { getAllSchedules, Schedule } from "@/lib/api/schedules";
@@ -35,17 +39,12 @@ import { cn } from "@/lib/utils";
 import { getUnreadAlerts, Alert, AlertSeverity, AlertType, markAsRead, markAllAsRead } from "@/lib/api/alerts";
 import { toast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
+import { Issue, getAllIssues, updateIssueStatus } from "@/lib/api/issues";
+import { Switch } from "@/components/ui/switch";
 
 
 
-interface Issue {
-  _id: string;
-  bin: { _id: string };
-  issueType: string;
-  description?: string;
-  createdAt: string;
-}
-
+// Interface for bin suggestion
 interface BinSuggestion {
   _id: string;
   reason: string;
@@ -53,7 +52,7 @@ interface BinSuggestion {
     longitude: number;
     latitude: number;
   };
-  address?: string; // Added optional address property
+  address?: string;
   createdAt: string;
 }
 
@@ -74,10 +73,12 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [issuesLoading, setIssuesLoading] = useState(true);
+  const [updatingIssue, setUpdatingIssue] = useState<string | null>(null);
   const [binSuggestions, setBinSuggestions] = useState<BinSuggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(true);
   const [selectedSuggestion, setSelectedSuggestion] = useState<BinSuggestion | null>(null);
-  const [suggestionBins, setSuggestionBins] = useState<Bin[]>([]); // New state for suggestion bins formatted for map
+  const [suggestionBins, setSuggestionBins] = useState<Bin[]>([]);
+  const [selectedIssueImage, setSelectedIssueImage] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<DashboardMetrics>({
     totalAreas: 0,
     totalBins: 0,
@@ -89,6 +90,7 @@ export default function DashboardPage() {
     fetchAreas();
     fetchAlerts();
     fetchAnalytics();
+    fetchIssues();
     // Fetch today's schedules
     const fetchTodays = async () => {
       // Use the same date format method as in schedules page
@@ -118,6 +120,58 @@ export default function DashboardPage() {
     } finally {
       setAreasLoading(false);
     }
+  };
+
+  // Fetch issues with our new API function
+  const fetchIssues = async () => {
+    try {
+      setIssuesLoading(true);
+      const issuesData = await getAllIssues();
+      setIssues(issuesData);
+    } catch (err) {
+      console.error('Error fetching issues:', err);
+      toast({
+        title: "Error fetching issues",
+        description: "Could not retrieve the latest issues",
+        variant: "destructive",
+      });
+    } finally {
+      setIssuesLoading(false);
+    }
+  };
+
+  // Handle updating issue status
+  const handleIssueStatusChange = async (issueId: string, newStatus: 'pending' | 'resolved') => {
+    try {
+      setUpdatingIssue(issueId);
+      const updatedIssue = await updateIssueStatus(issueId, newStatus);
+      
+      // Update the local state with the updated issue
+      setIssues(prevIssues => 
+        prevIssues.map(issue => 
+          issue._id === issueId ? { ...issue, status: updatedIssue.status } : issue
+        )
+      );
+      
+      toast({
+        title: "Status Updated",
+        description: `Issue has been marked as ${newStatus}`,
+      });
+    } catch (err) {
+      console.error('Error updating issue status:', err);
+      toast({
+        title: "Error updating status",
+        description: "Failed to update issue status",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingIssue(null);
+    }
+  };
+
+  // Show image in modal
+  const handleImageClick = (imageUrl: string) => {
+    setSelectedIssueImage(imageUrl);
   };
 
   // Fetch real alerts from the API
@@ -211,25 +265,6 @@ export default function DashboardPage() {
     const diffDays = Math.floor(diffHours / 24);
     return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
   };
-  useEffect(() => {
-    const fetchIssues = async () => {
-      try {
-        const response = await axios.get<Issue[]>("http://localhost:5000/api/issues", {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("adminToken")}`
-          }
-        });
-        
-        setIssues(response.data);
-      } catch (error) {
-        console.error("Error fetching issues:", error);
-      } finally {
-        setIssuesLoading(false);
-      }
-    };
-
-    fetchIssues();
-  }, []);
 
   const fetchAnalytics = async () => {
     try {
@@ -279,10 +314,11 @@ export default function DashboardPage() {
                 fetchAreas();
                 fetchAlerts();
                 fetchAnalytics();
+                fetchIssues();
               }}
-              disabled={loading || areasLoading}
+              disabled={loading || areasLoading || issuesLoading}
             >
-              {(loading || areasLoading) ? (
+              {(loading || areasLoading || issuesLoading) ? (
                 <RefreshCcw size={16} className="animate-spin mr-2" />
               ) : (
                 <RefreshCcw size={16} className="mr-2" />
@@ -292,6 +328,7 @@ export default function DashboardPage() {
           </div>
         </div>
         
+        {/* Stats cards - keeping the existing code */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-4 md:px-6 mb-4">
           <Card>
             <CardContent className="p-6">
@@ -366,9 +403,8 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Map and Alerts container - now with fixed height */}
+        {/* Map and Alerts container - keeping the existing code */}
         <div className="flex-1 grid gap-4 px-4 pb-4 md:px-6 md:pb-6 md:grid-cols-3" style={{ height: '600px' }}>
-          {/* Map card - takes 2/3 width on md+ screens */}
           <Card className="col-span-3 md:col-span-2 flex flex-col h-full">
             <CardHeader className="flex-shrink-0">
               <CardTitle className="flex items-center gap-2">
@@ -410,7 +446,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Real-time alerts container - takes 1/3 width on md+ screens */}
           <Card className="col-span-3 md:col-span-1 flex flex-col" style={{ height: "662px", maxHeight: "662px", overflowY: "auto" }}>
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between">
               <div>
@@ -489,16 +524,18 @@ export default function DashboardPage() {
         <div className="space-y-6">
           {/* Issues and Bin Suggestions Grid */}
           <div className="grid gap-4 md:grid-cols-1">
-            {/* Issues Section */}
+            {/* Issues Section - Updated with enhanced display and status toggle */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle size={20} className="text-red-500" />
-                  Reported Issues
-                </CardTitle>
-                <CardDescription>
-                  A detailed list of reported issues in the system.
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle size={20} className="text-red-500" />
+                    Reported Issues
+                  </CardTitle>
+                  <CardDescription>
+                    A detailed list of reported issues in the system. Toggle between pending and resolved states.
+                  </CardDescription>
+                </div>
               </CardHeader>
               <CardContent>
                 {issuesLoading ? (
@@ -511,27 +548,88 @@ export default function DashboardPage() {
                     <p className="text-sm text-muted-foreground">No issues reported.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                  <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2">
                     {issues.map((issue) => (
                       <div
                         key={issue._id}
-                        className="flex items-start gap-4 p-4 border rounded-md shadow-sm bg-white"
+                        className="flex flex-col gap-4 p-4 border rounded-md shadow-sm bg-white"
                       >
-                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
-                          <AlertTriangle size={20} />
+                        <div className="flex items-start gap-4">
+                          <div className={cn(
+                            "flex items-center justify-center w-10 h-10 rounded-full",
+                            issue.status === 'resolved' ? "bg-green-100 text-green-500" : "bg-red-100 text-red-500"
+                          )}>
+                            {issue.status === 'resolved' ? 
+                              <CheckCircle2 size={20} /> : 
+                              <AlertTriangle size={20} />
+                            }
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                              <p className="text-sm text-gray-600 mt-2">
+                                {issue.description || "No description provided"}
+                              </p>
+                              <Badge variant={issue.status === 'resolved' ? "outline" : "destructive"} className={cn(
+                                issue.status === 'resolved' ? "border-green-200 bg-green-50 text-green-700" : ""
+                              )}>
+                                {issue.status === 'resolved' ? 'Resolved' : 'Pending'}
+                              </Badge>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <h3 className="text-sm font-medium text-gray-800">
-                            {issue.issueType}
-                          </h3>
-                          <p className="text-xs text-muted-foreground">
-                            {issue.description || "No description provided"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            <strong>Bin:</strong> {issue.bin?._id || "Unknown"} |{" "}
-                            <strong>Reported At:</strong>{" "}
-                            {new Date(issue.createdAt).toLocaleString()}
-                          </p>
+
+                        {/* Image thumbnails - if available */}
+                        {issue.images && issue.images.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                              <ImageIcon size={12} />
+                              Attached Images:
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {issue.images.map((image, idx) => (
+                                <div
+                                  key={idx}
+                                  className="relative w-16 h-16 rounded-md border overflow-hidden cursor-pointer"
+                                  onClick={() => handleImageClick(image)}
+                                >
+                                  <img
+                                    src={image}
+                                    alt={`Issue ${idx + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Footer with metadata and action */}
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t">
+                          <div className="flex items-center text-xs text-gray-500 gap-4">
+                            <div className="flex items-center gap-1">
+                              <Clock size={12} />
+                              <span>Reported: {formatRelativeTime(issue.createdAt)}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">
+                              {issue.status === 'pending' ? 'Mark as resolved:' : 'Mark as pending:'}
+                            </span>
+                            <div className="relative">
+                              {updatingIssue === issue._id && (
+                                <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10 rounded-full">
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                </div>
+                              )}
+                              <Switch 
+                                checked={issue.status === 'resolved'}
+                                onCheckedChange={(checked) => {
+                                  handleIssueStatusChange(issue._id, checked ? 'resolved' : 'pending');
+                                }}
+                                disabled={updatingIssue === issue._id}
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -542,6 +640,34 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* Modal for viewing full images */}
+      {selectedIssueImage && (
+        <div 
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+          onClick={() => setSelectedIssueImage(null)}
+        >
+          <div className="relative max-w-2xl max-h-[80vh] p-2 bg-white rounded-lg">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="absolute top-2 right-2 z-10 bg-white/80 rounded-full"
+              onClick={() => setSelectedIssueImage(null)}
+            >
+              <span className="sr-only">Close</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6 6 18"></path>
+                <path d="m6 6 12 12"></path>
+              </svg>
+            </Button>
+            <img 
+              src={selectedIssueImage} 
+              alt="Issue detail" 
+              className="max-w-full max-h-[calc(80vh-2rem)] object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
