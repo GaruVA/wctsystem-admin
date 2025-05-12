@@ -481,7 +481,7 @@ const DayScheduleCard = ({
   
   // Format day number and name
   const formattedDay = format(day, "d");
-  const dayName = format(day, "EEE"); // Use standard 3-letter weekday format (Sun, Mon, Tue...)
+  const dayName = format(day, "EEE"); // Use standard 3-letter weekday format (Mon, Tue, Wed...)
   const isToday = isSameDay(day, new Date());
   
   return (
@@ -641,6 +641,7 @@ export default function SchedulePage() {
         
         // Process the weekly overview data
         const weeklyData = weeklyOverviewResponse.data || [];
+        console.log("Weekly overview data:", weeklyData);
         setWeeklyData(weeklyData);
         
         // Fetch daily schedules for the selected date
@@ -662,14 +663,35 @@ export default function SchedulePage() {
       
       // Format date for API query
       const dateString = format(date, "yyyy-MM-dd");
+      console.log("Fetching schedules for date:", dateString);
       
       // Fetch schedules specifically for the selected date
       const schedulesData = await getAllSchedules({ date: dateString });
+      console.log("Fetched schedules:", schedulesData);
+      
+      // Check if we have the expected number of schedules based on weekly data
+      const expectedDateData = weeklyData.find(item => item.date === dateString);
+      const expectedCount = expectedDateData?.totalCount || 0;
+      
+      if (schedulesData.length < expectedCount) {
+        console.warn(`Expected ${expectedCount} schedules but only received ${schedulesData.length}`);
+      }
       
       // Process schedules to ensure area and collector info is available
       const processedSchedules = schedulesData.map((schedule: Schedule) => {
-        if (!schedule.area && schedule.areaId) {
-          const matchingArea = areas.find((area: any) => area.areaID === schedule.areaId);
+        // Convert areaId and collectorId objects to proper area and collector properties
+        // This ensures consistent data format regardless of API response format
+        if (schedule.areaId && typeof schedule.areaId === 'object' && 'name' in schedule.areaId) {
+          const areaObj = schedule.areaId as unknown as { _id: string; name: string };
+          schedule.area = {
+            _id: areaObj._id,
+            name: areaObj.name || 'Unknown Area'
+          };
+        } else if (!schedule.area && schedule.areaId) {
+          // Try to find matching area from areas state
+          const matchingArea = areas.find((area: any) => 
+            area.areaID === (typeof schedule.areaId === 'string' ? schedule.areaId : (schedule.areaId as any)?._id)
+          );
           if (matchingArea) {
             schedule.area = {
               _id: matchingArea.areaID,
@@ -677,10 +699,30 @@ export default function SchedulePage() {
             };
           }
         }
+        
+        // Similar handling for collector
+        if (schedule.collectorId && typeof schedule.collectorId === 'object') {
+          const collectorObj = schedule.collectorId as unknown as { 
+            _id: string;
+            firstName?: string;
+            lastName?: string;
+            username?: string;
+          };
+          
+          if ('firstName' in collectorObj || 'lastName' in collectorObj) {
+            schedule.collector = {
+              _id: collectorObj._id,
+              firstName: collectorObj.firstName || '',
+              lastName: collectorObj.lastName || '',
+              username: collectorObj.username || ''
+            };
+          }
+        }
+        
         return schedule;
       });
       
-      // Update filtered schedules state with the daily data
+      console.log("Processed schedules:", processedSchedules);
       setFilteredSchedules(processedSchedules);
     } catch (err) {
       console.error('Error fetching daily schedules:', err);
@@ -706,7 +748,6 @@ export default function SchedulePage() {
   // Handle day card click
   const handleDaySelect = (day: Date) => {
     setSelectedDate(day);
-    
     // Fetch the schedules for the selected day
     fetchDailySchedules(day);
   };

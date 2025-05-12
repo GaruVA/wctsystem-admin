@@ -64,16 +64,12 @@ export async function getAllSchedules(
   try {
     const queryParams = new URLSearchParams();
     
-    // Add query parameters if present - handle both date and date range params
+    // Add query parameters if present - handle date parameter distinctly
     if (query.date) {
-      // Format the date as YYYY-MM-DD for the API
+      // When fetching a specific date, just use the date parameter
       queryParams.append('date', query.date);
-      
-      // If no explicit fromDate/toDate provided, use date for both
-      if (!query.fromDate) queryParams.append('fromDate', query.date);
-      if (!query.toDate) queryParams.append('toDate', query.date);
     } else {
-      // If no specific date but we have fromDate/toDate range
+      // Only use fromDate/toDate for date ranges, not when a specific date is requested
       if (query.fromDate) queryParams.append('fromDate', query.fromDate);
       if (query.toDate) queryParams.append('toDate', query.toDate);
     }
@@ -89,6 +85,8 @@ export async function getAllSchedules(
     if (!token) {
       throw new Error('Authentication token not found');
     }
+    
+    console.log(`Fetching schedules from: ${url}`);
     
     const response = await fetch(url, {
       headers: {
@@ -109,6 +107,8 @@ export async function getAllSchedules(
     const schedules = Array.isArray(schedulesData) 
       ? schedulesData 
       : [];
+    
+    console.log(`API returned ${schedules.length} schedules`);
     
     // Map through schedules to normalize the structure
     return schedules.map(schedule => {
