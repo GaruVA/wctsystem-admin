@@ -121,7 +121,6 @@ export default function RouteCreationDialog({
     // State for route parameters
     const [selectedArea, setSelectedArea] = useState<string>("");
     const [fillThreshold, setFillThreshold] = useState<number>(70);
-    const [includeAllCritical, setIncludeAllCritical] = useState<boolean>(true);
     const [wasteTypeFilter, setWasteTypeFilter] = useState<string>("GENERAL");
     const [selectedCollector, setSelectedCollector] = useState<string>("");
     const [scheduleName, setScheduleName] = useState<string>("");
@@ -255,8 +254,7 @@ export default function RouteCreationDialog({
             // Prepare route parameters
             const parameters: RouteParameters = {
                 fillLevelThreshold: fillThreshold,
-                wasteType: wasteTypeFilter,
-                includeCriticalBins: includeAllCritical
+                wasteType: wasteTypeFilter
             };
 
             // Call API to get optimized route
@@ -617,19 +615,6 @@ export default function RouteCreationDialog({
                     <p className="text-xs text-muted-foreground">
                         Only bins with fill level at or above this threshold will be included
                     </p>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                    <Checkbox
-                        id="critical-bins"
-                        checked={includeAllCritical}
-                        onCheckedChange={(checked) =>
-                            setIncludeAllCritical(checked === true)
-                        }
-                    />
-                    <Label htmlFor="critical-bins">
-                        Include all critical bins (≥ 90%) regardless of other filters
-                    </Label>
                 </div>
 
                 <div className="space-y-3">
