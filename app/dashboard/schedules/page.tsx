@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -51,6 +51,7 @@ import { format, addDays, subDays, isSameDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import BinMap from "@/components/dashboard/bin-map";
 import RouteMap from "@/components/dashboard/route-map";
+import RouteMapEditor from "@/components/dashboard/route-map-editor";
 import RouteCreationDialog from "@/components/dashboard/route-creation-dialog";
 import { getAllAreasWithBins, AreaWithBins } from "@/lib/api/areas"; 
 import { 
@@ -59,9 +60,12 @@ import {
   deleteSchedule, 
   updateScheduleStatus, 
   Schedule,
-  getWeeklyScheduleOverview 
+  getWeeklyScheduleOverview,
+  updateSchedule
 } from "@/lib/api/schedules";
 import { getActiveCollectors, Collector } from "@/lib/api/collectors";
+import { debounce } from "lodash";
+import { toast } from "@/components/ui/use-toast";
 
 // Schedule Status Badge Component
 const StatusBadge = ({ status }: { status: string }) => {
@@ -96,8 +100,60 @@ const ScheduleDetailsDialog = ({
 }) => {
   const [activeTab, setActiveTab] = useState("details");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [detailedSchedule, setDetailedSchedule] = useState<Schedule | null>(schedule);
+  const [collectors, setCollectors] = useState<Collector[]>([]);
+  const [routeEditMode, setRouteEditMode] = useState(false);
+  const [editedRoute, setEditedRoute] = useState<Array<[number, number]> | null>(null);
+
+  // Handle field updates with debounce
+  const debouncedUpdateSchedule = useCallback(
+    debounce(async (id: string, data: Partial<any>) => {
+      try {
+        setIsSaving(true);
+        const updatedSchedule = await updateSchedule(id, data);
+        setDetailedSchedule(prevState => ({
+          ...prevState!,
+          ...updatedSchedule
+        }));
+        
+        toast({
+          title: "Schedule updated",
+          description: "Changes have been saved",
+          variant: "default" // Using "default" instead of "success" to match available variants
+        });
+      } catch (error) {
+        console.error("Error updating schedule:", error);
+        toast({
+          title: "Update failed",
+          description: "Failed to save changes",
+          variant: "destructive"
+        });
+      } finally {
+        setIsSaving(false);
+      }
+    }, 500),
+    []
+  );
+
+  // Load available collectors
+  useEffect(() => {
+    const loadCollectors = async () => {
+      try {
+        const response = await getActiveCollectors();
+        if (response && response.collectors) {
+          setCollectors(response.collectors);
+        }
+      } catch (err) {
+        console.error("Error loading collectors:", err);
+      }
+    };
+
+    if (isOpen) {
+      loadCollectors();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (schedule?._id && isOpen) {
@@ -117,6 +173,14 @@ const ScheduleDetailsDialog = ({
       setDetailedSchedule(schedule);
     }
   }, [schedule, isOpen]);
+
+  // Reset route edit mode when closing dialog
+  useEffect(() => {
+    if (!isOpen) {
+      setRouteEditMode(false);
+      setEditedRoute(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen || !detailedSchedule) return null;
   
@@ -147,6 +211,110 @@ const ScheduleDetailsDialog = ({
     return format(new Date(time), "h:mm a");
   };
 
+  // Field change handlers
+  const handleDateChange = (date: Date | null) => {
+    if (date && detailedSchedule._id) {
+      setDetailedSchedule(prev => ({
+        ...prev!,
+        date: format(date, "yyyy-MM-dd")
+      }));
+      
+      debouncedUpdateSchedule(detailedSchedule._id, { 
+        date: format(date, "yyyy-MM-dd") 
+      });
+    }
+  };
+
+  const handleStartTimeChange = (time: Date | null) => {
+    if (time && detailedSchedule._id) {
+      setDetailedSchedule(prev => ({
+        ...prev!,
+        startTime: time.toISOString()
+      }));
+      
+      debouncedUpdateSchedule(detailedSchedule._id, { 
+        startTime: time.toISOString() 
+      });
+    }
+  };
+
+  const handleCollectorChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const collectorId = event.target.value;
+    if (detailedSchedule._id) {
+      // Find the selected collector's full data
+      const selectedCollector = collectorId 
+        ? collectors.find(c => c._id === collectorId) 
+        : null;
+
+      // Update both collectorId and collector object in the state
+      setDetailedSchedule(prev => ({
+        ...prev!,
+        collectorId,
+        // If collector is selected, add their full data to state
+        collector: selectedCollector ? {
+          _id: selectedCollector._id,
+          firstName: selectedCollector.firstName || '',
+          lastName: selectedCollector.lastName || '',
+          username: selectedCollector.username || '',
+          phone: selectedCollector.phone || ''
+        } : undefined
+      }));
+      
+      // Send update to backend
+      debouncedUpdateSchedule(detailedSchedule._id, { collectorId });
+    }
+  };
+
+  const handleNotesChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const notes = event.target.value;
+    if (detailedSchedule._id) {
+      setDetailedSchedule(prev => ({
+        ...prev!,
+        notes
+      }));
+      
+      debouncedUpdateSchedule(detailedSchedule._id, { notes });
+    }
+  };
+
+  const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const name = event.target.value;
+    if (detailedSchedule._id) {
+      setDetailedSchedule(prev => ({
+        ...prev!,
+        name
+      }));
+      
+      debouncedUpdateSchedule(detailedSchedule._id, { name });
+    }
+  };
+
+  // Route edit handlers
+  const toggleRouteEditMode = () => {
+    setRouteEditMode(!routeEditMode);
+    // Reset edited route when leaving edit mode
+    if (routeEditMode) {
+      setEditedRoute(null);
+    }
+  };
+
+  const handleRouteChange = (newRoute: Array<[number, number]>, distance: number) => {
+    setEditedRoute(newRoute);
+    
+    if (detailedSchedule._id) {
+      // Calculate new duration based on distance
+      const avgSpeedKmPerHour = 10; // Average speed for waste collection vehicle in urban area
+      const newDurationMinutes = Math.max(1, Math.round((distance / avgSpeedKmPerHour) * 60));
+      
+      // Update schedule with new route, distance and duration
+      debouncedUpdateSchedule(detailedSchedule._id, {
+        route: newRoute,
+        distance,
+        duration: newDurationMinutes
+      });
+    }
+  };
+
   // Handle delete confirmation
   const handleDelete = () => {
     if (detailedSchedule._id) {
@@ -165,12 +333,15 @@ const ScheduleDetailsDialog = ({
           </DialogHeader>
           <div className="flex flex-col space-y-1.5 p-6 pb-2">
             <div className="flex justify-between items-start">
-              <div>
-                <div className="text-2xl font-semibold leading-none tracking-tight flex items-center gap-2">
-                  <CalendarDays size={18} />
-                  {scheduleName}
-                </div>
-              </div>
+              <input 
+                value={detailedSchedule.name}
+                onChange={handleNameChange}
+                className="text-2xl font-semibold leading-none tracking-tight"
+              />
+              {isSaving && <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Saving...
+              </div>}
             </div>
           </div>
           
@@ -221,20 +392,37 @@ const ScheduleDetailsDialog = ({
                         <CardContent className="text-sm space-y-4">
                           <div className="grid grid-cols-2 gap-y-4">
                             <div className="font-medium">Date</div>
-                            <div>{scheduleDate}</div>
+                            <div>
+                              <input
+                                type="date"
+                                value={format(new Date(detailedSchedule.date), "yyyy-MM-dd")}
+                                onChange={(e) => handleDateChange(e.target.valueAsDate)}
+                                className="w-full rounded-md border px-2 py-1.5 text-sm"
+                              />
+                            </div>
                             
                             <div className="font-medium">Start Time</div>
                             <div>
-                              {detailedSchedule.startTime 
-                                ? format(new Date(detailedSchedule.startTime), "h:mm a") 
-                                : 'Not set'}
+                              <input
+                                type="time"
+                                value={detailedSchedule.startTime ? format(new Date(detailedSchedule.startTime), "HH:mm") : ""}
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    const [hours, minutes] = e.target.value.split(':').map(Number);
+                                    const date = new Date(detailedSchedule.date);
+                                    date.setHours(hours, minutes, 0, 0);
+                                    handleStartTimeChange(date);
+                                  }
+                                }}
+                                className="w-full rounded-md border px-2 py-1.5 text-sm"
+                              />
                             </div>
                             
                             <div className="font-medium">End Time</div>
-                            <div>
+                            <div className="text-muted-foreground">
                               {detailedSchedule.endTime 
                                 ? format(new Date(detailedSchedule.endTime), "h:mm a") 
-                                : 'Not set'}
+                                : 'Auto-calculated'}
                             </div>
                             
                             <div className="font-medium">Duration</div>
@@ -251,16 +439,33 @@ const ScheduleDetailsDialog = ({
                             <div>
                               <StatusBadge status={detailedSchedule.status} />
                             </div>
+
+                            <div className="font-medium">Collector</div>
+                            <div>
+                              <select
+                                value={detailedSchedule.collector?._id || detailedSchedule.collectorId || ''}
+                                onChange={handleCollectorChange}
+                                className="w-full rounded-md border px-2 py-1.5 text-sm"
+                              >
+                                <option value="">Unassigned</option>
+                                {collectors.map((collector) => (
+                                  <option key={collector._id} value={collector._id}>
+                                    {collector.firstName} {collector.lastName}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                           
-                          {detailedSchedule.notes && (
-                            <div className="pt-4 border-t mt-4">
-                              <h4 className="font-medium mb-2">Notes</h4>
-                              <div className="bg-muted/50 p-3 rounded-md whitespace-pre-wrap text-sm">
-                                {detailedSchedule.notes}
-                              </div>
-                            </div>
-                          )}
+                          <div className="pt-4 border-t mt-4">
+                            <h4 className="font-medium mb-2">Notes</h4>
+                            <textarea
+                              value={detailedSchedule.notes || ''}
+                              onChange={handleNotesChange}
+                              className="w-full rounded-md border px-3 py-2 text-sm min-h-[100px]"
+                              placeholder="Add schedule notes here..."
+                            />
+                          </div>
                         </CardContent>
                       </Card>
                       
@@ -327,14 +532,16 @@ const ScheduleDetailsDialog = ({
                   <TabsContent value="route" className="mt-0">
                     <div className="h-[500px] rounded-md overflow-hidden">
                       {detailedSchedule.route && detailedSchedule.route.length > 0 ? (
-                        <RouteMap 
+                        <RouteMapEditor 
                           routeBins={Array.isArray(detailedSchedule.binSequence) 
                             ? detailedSchedule.binSequence
                                 .filter((bin): bin is any => typeof bin === 'object' && bin !== null && '_id' in bin)
                             : []}
-                          routePolyline={detailedSchedule.route}
+                          routePolyline={editedRoute || detailedSchedule.route}
                           style={{ height: "500px", width: "100%" }}
                           showSequenceNumbers={true}
+                          editable={true} // Always editable - use Leaflet.draw's built-in controls
+                          onRouteChange={handleRouteChange}
                         />
                       ) : (
                         <div className="h-full flex items-center justify-center bg-muted/50">

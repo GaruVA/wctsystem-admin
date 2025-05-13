@@ -396,3 +396,38 @@ export async function getWeeklyScheduleOverview(
     throw error;
   }
 }
+
+/**
+ * Auto-generate a schedule based on waste type and fill level threshold
+ */
+export async function autoGenerateSchedule(
+  areaId: string,
+  wasteType: string,
+  fillThreshold: number = 70
+): Promise<any> {
+  try {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/schedules/auto-generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ areaId, wasteType, fillThreshold })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to auto-generate schedule');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error auto-generating schedule:', error);
+    throw error;
+  }
+}
