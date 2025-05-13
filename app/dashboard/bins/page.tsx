@@ -97,6 +97,7 @@ export default function BinManagementPage() {
   const [areas, setAreas] = useState<AreaWithBins[]>([]);
   const [areasLoading, setAreasLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCoordinates, setSelectedCoordinates] = useState<[number, number] | null>(null);
 
   // Pagination and filtering states
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -524,6 +525,12 @@ export default function BinManagementPage() {
   // Handle page change
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+  };
+
+  const handleMapClick = (coordinates: [number, number]) => {
+    setSelectedCoordinates(coordinates);
+    setNewBinLatitude(coordinates[1].toString());
+    setNewBinLongitude(coordinates[0].toString());
   };
 
   return (
@@ -960,10 +967,11 @@ export default function BinManagementPage() {
           <DialogHeader>
             <DialogTitle>Add New Bin</DialogTitle>
             <DialogDescription>
-              Create a new waste collection bin by specifying its location and type.
+              Create a new waste collection bin by specifying its location, type, and status.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {/* Waste Type Dropdown */}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="waste-type" className="text-right">
                 Waste Type
@@ -983,25 +991,8 @@ export default function BinManagementPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">
-                Status
-              </Label>
-              <Select
-                value={newBinStatus}
-                onValueChange={setNewBinStatus}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ACTIVE">Active</SelectItem>
-                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                  <SelectItem value="INACTIVE">Inactive</SelectItem>
-                  <SelectItem value="PENDING_INSTALLATION">Pending Installation</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
+            {/* Latitude Input */}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Latitude</Label>
               <Input
@@ -1011,6 +1002,8 @@ export default function BinManagementPage() {
                 className="col-span-3"
               />
             </div>
+
+            {/* Longitude Input */}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Longitude</Label>
               <Input
@@ -1018,6 +1011,38 @@ export default function BinManagementPage() {
                 onChange={(e) => setNewBinLongitude(e.target.value)}
                 placeholder="Enter longitude"
                 className="col-span-3"
+              />
+            </div>
+
+            {/* Bin Status Dropdown */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="bin-status" className="text-right">
+                Bin Status
+              </Label>
+              <Select
+                value={newBinStatus}
+                onValueChange={setNewBinStatus}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select bin status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  <SelectItem value="PENDING_INSTALLATION">Pending Installation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Map for Selecting Location */}
+            <div className="h-[400px] border rounded-md overflow-hidden">
+              <SuggestionBinMap
+                suggestionBins={[]}
+                onBinSelect={(bin) => {
+                  if (bin) handleMapClick([bin.location.coordinates[0], bin.location.coordinates[1]]);
+                }}
+                style={{ height: "100%" }}
               />
             </div>
           </div>
