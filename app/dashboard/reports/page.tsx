@@ -170,50 +170,74 @@ export default function AdminReportsView() {
 
     // Add a title
     doc.setFontSize(16);
-    doc.text("Admin Reports", 10, 10);
+    doc.text("Admin Reports", 105, 10, { align: "center" }); // Center the title
 
     // Add AI Insights
     doc.setFontSize(14);
-    doc.text("AI Insights:", 10, 20);
+    doc.text("AI Insights:", 105, 20, { align: "center" }); // Center the AI Insights header
+
     if (aiInsights) {
+      // Parse the JSON insights into a readable format
       const insights = aiInsights
         .split(/\d+\.\s+/) // Split insights by numbered points
         .filter((insight) => insight.trim() !== ""); // Remove empty lines
 
+      let yOffset = 30; // Start position for the insights
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 10; // Left and right margin
+      const maxWidth = pageWidth - margin * 2; // Maximum width for text
+
       insights.forEach((insight, index) => {
-        doc.text(`${index + 1}. ${insight.trim()}`, 10, 30 + index * 10);
+        // Wrap the text to fit within the page width
+        const wrappedText: string[] = doc.splitTextToSize(`${index + 1}. ${insight.trim()}`, maxWidth);
+
+        // Check if the text fits on the current page, otherwise add a new page
+        if (yOffset + wrappedText.length * 10 > 280) {
+          doc.addPage();
+          yOffset = 20; // Reset yOffset for the new page
+        }
+
+        // Add the wrapped text to the PDF
+        wrappedText.forEach((line) => {
+          doc.text(line, margin, yOffset);
+          yOffset += 10; // Add spacing between lines
+        });
       });
     } else {
-      doc.text("No AI insights available.", 10, 30);
+      doc.text("No AI insights available.", 105, 30, { align: "center" }); // Center the fallback text
     }
 
     // Add a page for charts
     doc.addPage();
     doc.setFontSize(14);
-    doc.text("Charts:", 10, 10);
+    doc.text("Charts:", 105, 10, { align: "center" }); // Center the Charts header
 
     // Capture all unique charts as images
-    const chartContainers = document.querySelectorAll(".chart-container"); // Select all chart containers
-    const uniqueCharts = new Set();
+    const chartContainers = document.querySelectorAll(".chart-container");
+    const processedCharts = new Set(); // Track processed chart containers
     let yOffset = 20;
 
     for (const chartContainer of chartContainers) {
-      if (!uniqueCharts.has(chartContainer)) {
-        uniqueCharts.add(chartContainer);
-        const canvas = await html2canvas(chartContainer as HTMLElement);
-        const imgData = canvas.toDataURL("image/png");
-        const imgWidth = 180; // Adjust width as needed
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-        if (yOffset + imgHeight > 280) {
-          // Add a new page if the image doesn't fit
-          doc.addPage();
-          yOffset = 20;
-        }
-
-        doc.addImage(imgData, "PNG", 10, yOffset, imgWidth, imgHeight);
-        yOffset += imgHeight + 10; // Add spacing between charts
+      const chartId = chartContainer.getAttribute("data-chart-id"); // Use a unique identifier for each chart
+      if (!chartId || processedCharts.has(chartId)) {
+        continue; // Skip if the chart has already been processed
       }
+
+      processedCharts.add(chartId); // Mark the chart as processed
+
+      const canvas = await html2canvas(chartContainer as HTMLElement);
+      const imgData = canvas.toDataURL("image/png");
+      const imgWidth = 180; // Adjust width as needed
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      if (yOffset + imgHeight > 280) {
+        // Add a new page if the image doesn't fit
+        doc.addPage();
+        yOffset = 20;
+      }
+
+      doc.addImage(imgData, "PNG", 10, yOffset, imgWidth, imgHeight);
+      yOffset += imgHeight + 10; // Add spacing between charts
     }
 
     // Save the PDF
@@ -373,7 +397,7 @@ export default function AdminReportsView() {
               </CardTitle>
               <CardDescription>Trends of bin fill levels over time, grouped by area</CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px] flex items-center justify-center chart-container">
+            <CardContent className="h-[300px] flex items-center justify-center chart-container" data-chart-id={`fill-level-trends`}>
               {Object.keys(fillLevelTrends).length > 0 ? (
                 <div className="chart-container h-[300px] w-full">
                   <Line data={fillLevelTrendsData} options={{
@@ -412,7 +436,7 @@ export default function AdminReportsView() {
               </CardTitle>
               <CardDescription>Overview of critical bins and scheduled collections by area</CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px] flex items-center justify-center chart-container">
+            <CardContent className="h-[300px] flex items-center justify-center chart-container" data-chart-id="area-status-overview">
               {areaStatusOverview.length > 0 ? (
                 <Bar
                   data={areaStatusData}
@@ -446,7 +470,7 @@ export default function AdminReportsView() {
                 </CardTitle>
                 <CardDescription>Average efficiency by area for the current {timeRange}</CardDescription>
               </CardHeader>
-              <CardContent className="h-[300px] flex items-center justify-center chart-container">
+              <CardContent className="h-[300px] flex items-center justify-center chart-container" data-chart-id="collection-efficiency">
                 {collectionEfficiencyData.length > 0 ? (
                   <div className="chart-container h-[300px] w-full">
                     <Bar data={collectionEfficiencyChartData} options={{
@@ -479,7 +503,7 @@ export default function AdminReportsView() {
                 </CardTitle>
                 <CardDescription>Distribution of bin fill levels across areas</CardDescription>
               </CardHeader>
-              <CardContent className="h-[300px] flex items-center justify-center chart-container">
+              <CardContent className="h-[300px] flex items-center justify-center chart-container" data-chart-id="bin-utilization">
                 {collectionEfficiencyData.length > 0 ? (
                   <div className="chart-container h-[300px] w-full">
                     <Pie data={binUtilizationChartData} options={{
@@ -557,27 +581,20 @@ export default function AdminReportsView() {
               </CardTitle>
               <CardDescription>Distribution of bins needing collection by waste type</CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px] flex items-center justify-center chart-container">
-              {Object.keys(wasteTypeAnalytics).length > 0 ? (
-                <Bar
-                  data={wasteTypeAnalyticsData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        title: {
-                          display: true,
-                          text: "Number of Bins",
-                        },
-                      },
+            <CardContent className="h-[300px] flex items-center justify-center chart-container" data-chart-id="waste-type-analytics">
+              <Bar data={wasteTypeAnalyticsData} options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    title: {
+                      display: true,
+                      text: "Number of Bins",
                     },
-                  }}
-                />
-              ) : (
-                <p className="text-muted-foreground">No data available</p>
-              )}
+                  },
+                },
+              }} />
             </CardContent>
           </Card>
 
