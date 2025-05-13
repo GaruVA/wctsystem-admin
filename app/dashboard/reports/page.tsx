@@ -22,13 +22,16 @@ import {
   Tooltip,
   Legend,
 } from "chart.js"
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 // Register ChartJS components
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend)
 
-// Define types for API responses
+// Update FillLevelTrends type to match the new backend response
 interface FillLevelTrends {
-  [areaName: string]: { fillLevel: number; lastCollected: string }[]
+  area: string;
+  trends: { date: string; averageFillLevel: number }[];
 }
 
 interface Analytics {
@@ -80,7 +83,7 @@ api.interceptors.request.use((config) => {
 })
 
 export default function AdminReportsView() {
-  const [fillLevelTrends, setFillLevelTrends] = useState<FillLevelTrends>({})
+  const [fillLevelTrends, setFillLevelTrends] = useState<Record<string, { date: string; averageFillLevel: number }[]>>({})
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [wasteTypeAnalytics, setWasteTypeAnalytics] = useState<WasteTypeAnalytics>({})
   const [areaStatusOverview, setAreaStatusOverview] = useState<AreaStatusOverview[]>([])
@@ -97,6 +100,7 @@ export default function AdminReportsView() {
     fetchReports()
   }, [timeRange])
 
+  // Update fetchReports to handle the new structure
   const fetchReports = async () => {
     setLoading(true);
     try {
@@ -107,7 +111,7 @@ export default function AdminReportsView() {
         areaStatusOverviewResponse,
         collectionEfficiencyResponse,
       ] = await Promise.all([
-        api.get<FillLevelTrends>(`/analytics/fill-level-trends?timeRange=${timeRange}`),
+        api.get<FillLevelTrends[]>(`/analytics/fill-level-trends?timeRange=${timeRange}`),
         api.get<Analytics>(`/analytics/analytics?timeRange=${timeRange}`),
         api.get<WasteTypeAnalytics>(`/analytics/waste-type?timeRange=${timeRange}`),
         api.get<AreaStatusOverview[]>(`/analytics/area-status?timeRange=${timeRange}`),
@@ -115,13 +119,13 @@ export default function AdminReportsView() {
       ]);
 
       // Transform fillLevelTrends to match the frontend's needs
-      const transformedTrends = Object.entries(fillLevelTrendsResponse.data).reduce((acc, [areaName, trends]) => {
-        acc[areaName] = trends.map((trend) => ({
-          fillLevel: trend.fillLevel,
-          lastCollected: trend.lastCollected,
-        })).sort((a, b) => new Date(a.lastCollected).getTime() - new Date(b.lastCollected).getTime());
+      const transformedTrends = fillLevelTrendsResponse.data.reduce((acc, trend) => {
+        acc[trend.area] = trend.trends.map(({ date, averageFillLevel }) => ({
+          date,
+          averageFillLevel,
+        })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         return acc;
-      }, {} as FillLevelTrends);
+      }, {} as Record<string, { date: string; averageFillLevel: number }[]>);
 
       setFillLevelTrends(transformedTrends);
       setAnalytics(analyticsResponse.data);
@@ -161,11 +165,66 @@ export default function AdminReportsView() {
     }
   };
 
+  const exportReports = async () => {
+    const doc = new jsPDF();
+
+    // Add a title
+    doc.setFontSize(16);
+    doc.text("Admin Reports", 10, 10);
+
+    // Add AI Insights
+    doc.setFontSize(14);
+    doc.text("AI Insights:", 10, 20);
+    if (aiInsights) {
+      const insights = aiInsights
+        .split(/\d+\.\s+/) // Split insights by numbered points
+        .filter((insight) => insight.trim() !== ""); // Remove empty lines
+
+      insights.forEach((insight, index) => {
+        doc.text(`${index + 1}. ${insight.trim()}`, 10, 30 + index * 10);
+      });
+    } else {
+      doc.text("No AI insights available.", 10, 30);
+    }
+
+    // Add a page for charts
+    doc.addPage();
+    doc.setFontSize(14);
+    doc.text("Charts:", 10, 10);
+
+    // Capture all unique charts as images
+    const chartContainers = document.querySelectorAll(".chart-container"); // Select all chart containers
+    const uniqueCharts = new Set();
+    let yOffset = 20;
+
+    for (const chartContainer of chartContainers) {
+      if (!uniqueCharts.has(chartContainer)) {
+        uniqueCharts.add(chartContainer);
+        const canvas = await html2canvas(chartContainer as HTMLElement);
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidth = 180; // Adjust width as needed
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        if (yOffset + imgHeight > 280) {
+          // Add a new page if the image doesn't fit
+          doc.addPage();
+          yOffset = 20;
+        }
+
+        doc.addImage(imgData, "PNG", 10, yOffset, imgWidth, imgHeight);
+        yOffset += imgHeight + 10; // Add spacing between charts
+      }
+    }
+
+    // Save the PDF
+    doc.save("Admin_Reports.pdf");
+  };
+
   // Prepare data for charts
   const fillLevelTrendsData = {
     labels: Object.keys(fillLevelTrends).length > 0
       ? Object.values(fillLevelTrends)[0].map((trend) =>
-          new Date(trend.lastCollected).toLocaleDateString("en-US", {
+          new Date(trend.date).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
           })
@@ -173,7 +232,7 @@ export default function AdminReportsView() {
       : [],
     datasets: Object.keys(fillLevelTrends).map((areaName, index) => ({
       label: areaName,
-      data: fillLevelTrends[areaName].map((trend) => trend.fillLevel),
+      data: fillLevelTrends[areaName].map((trend) => trend.averageFillLevel),
       borderColor: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"][index % 4],
       backgroundColor: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"][index % 4],
       tension: 0.3,
@@ -267,7 +326,7 @@ export default function AdminReportsView() {
               </>
             )}
           </Button>
-          <Button size="sm">
+          <Button size="sm" onClick={exportReports}>
             <Download className="mr-2 h-4 w-4" />
             Export Reports
           </Button>
@@ -314,11 +373,10 @@ export default function AdminReportsView() {
               </CardTitle>
               <CardDescription>Trends of bin fill levels over time, grouped by area</CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px] flex items-center justify-center">
+            <CardContent className="h-[300px] flex items-center justify-center chart-container">
               {Object.keys(fillLevelTrends).length > 0 ? (
-                <Line
-                  data={fillLevelTrendsData}
-                  options={{
+                <div className="chart-container h-[300px] w-full">
+                  <Line data={fillLevelTrendsData} options={{
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
@@ -337,8 +395,8 @@ export default function AdminReportsView() {
                         },
                       },
                     },
-                  }}
-                />
+                  }} />
+                </div>
               ) : (
                 <p className="text-muted-foreground">No data available</p>
               )}
@@ -354,7 +412,7 @@ export default function AdminReportsView() {
               </CardTitle>
               <CardDescription>Overview of critical bins and scheduled collections by area</CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px] flex items-center justify-center">
+            <CardContent className="h-[300px] flex items-center justify-center chart-container">
               {areaStatusOverview.length > 0 ? (
                 <Bar
                   data={areaStatusData}
@@ -388,11 +446,10 @@ export default function AdminReportsView() {
                 </CardTitle>
                 <CardDescription>Average efficiency by area for the current {timeRange}</CardDescription>
               </CardHeader>
-              <CardContent className="h-[300px] flex items-center justify-center">
+              <CardContent className="h-[300px] flex items-center justify-center chart-container">
                 {collectionEfficiencyData.length > 0 ? (
-                  <Bar
-                    data={collectionEfficiencyChartData}
-                    options={{
+                  <div className="chart-container h-[300px] w-full">
+                    <Bar data={collectionEfficiencyChartData} options={{
                       responsive: true,
                       maintainAspectRatio: false,
                       scales: {
@@ -405,8 +462,8 @@ export default function AdminReportsView() {
                           },
                         },
                       },
-                    }}
-                  />
+                    }} />
+                  </div>
                 ) : (
                   <p className="text-muted-foreground">No data available</p>
                 )}
@@ -422,11 +479,10 @@ export default function AdminReportsView() {
                 </CardTitle>
                 <CardDescription>Distribution of bin fill levels across areas</CardDescription>
               </CardHeader>
-              <CardContent className="h-[300px] flex items-center justify-center">
+              <CardContent className="h-[300px] flex items-center justify-center chart-container">
                 {collectionEfficiencyData.length > 0 ? (
-                  <Pie
-                    data={binUtilizationChartData}
-                    options={{
+                  <div className="chart-container h-[300px] w-full">
+                    <Pie data={binUtilizationChartData} options={{
                       responsive: true,
                       maintainAspectRatio: false,
                       plugins: {
@@ -439,8 +495,8 @@ export default function AdminReportsView() {
                           },
                         },
                       },
-                    }}
-                  />
+                    }} />
+                  </div>
                 ) : (
                   <p className="text-muted-foreground">No data available</p>
                 )}
@@ -460,7 +516,7 @@ export default function AdminReportsView() {
               <CardDescription>Detailed performance metrics for each collection area</CardDescription>
             </CardHeader>
             <CardContent className="h-[400px] flex items-center justify-center">
-              {analytics ? (
+              {analytics && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                   {Object.entries(analytics).map(([areaName, data]) => (
                     <Card key={areaName} className="p-4">
@@ -486,8 +542,6 @@ export default function AdminReportsView() {
                     </Card>
                   ))}
                 </div>
-              ) : (
-                <p className="text-muted-foreground">No area analysis data available</p>
               )}
             </CardContent>
           </Card>
@@ -503,7 +557,7 @@ export default function AdminReportsView() {
               </CardTitle>
               <CardDescription>Distribution of bins needing collection by waste type</CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px] flex items-center justify-center">
+            <CardContent className="h-[300px] flex items-center justify-center chart-container">
               {Object.keys(wasteTypeAnalytics).length > 0 ? (
                 <Bar
                   data={wasteTypeAnalyticsData}
@@ -567,7 +621,7 @@ export default function AdminReportsView() {
             </CardHeader>
             <CardContent className="h-[400px] flex flex-col items-center justify-center space-y-6">
               {/* Collection Efficiency Chart */}
-              <div className="w-full">
+              <div className="w-full chart-container">
                 <Bar
                   data={collectionEfficiencyChartData}
                   options={{
@@ -594,7 +648,7 @@ export default function AdminReportsView() {
               </div>
 
               {/* Bin Utilization Chart */}
-              <div className="w-full">
+              <div className="w-full chart-container">
                 <Bar
                   data={{
                     labels: collectionEfficiencyData.map((data) => data.areaName),
@@ -633,20 +687,27 @@ export default function AdminReportsView() {
         </TabsContent>
       </Tabs>
 
-      {/* AI Insights Text Box */}
+      {/* AI Insights Section */}
       <div className="mt-4">
         <label htmlFor="ai-insights" className="block text-sm font-medium text-gray-700">
           AI Insights
         </label>
-        <textarea
-          id="ai-insights"
-          rows={6}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          value={aiInsights ? JSON.stringify(JSON.parse(aiInsights), null, 2) : ""}
-          onChange={(e) => setAIInsights(e.target.value)} // Allow editing if needed
-          placeholder="AI insights will appear here..."
-          disabled={aiLoading}
-        />
+        <div className="mt-2 p-4 border rounded-md bg-gray-50">
+          {aiInsights ? (
+            <ul className="list-disc pl-5 space-y-2">
+              {aiInsights
+                .split(/\d+\.\s+/) // Split insights by numbered points
+                .filter((insight) => insight.trim() !== "") // Remove empty lines
+                .map((insight, index) => (
+                  <li key={index} className="text-sm text-gray-800">
+                    {insight.trim()}
+                  </li>
+                ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-500">AI insights will appear here...</p>
+          )}
+        </div>
         {aiError && <p className="mt-2 text-sm text-red-600">{aiError}</p>}
       </div>
     </div>
