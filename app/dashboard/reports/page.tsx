@@ -316,6 +316,8 @@ export default function AdminReportsView() {
   console.log("fillLevelTrends:", fillLevelTrends);
   console.log("Object.keys(fillLevelTrends):", Object.keys(fillLevelTrends));
   console.log("fillLevelTrends[Object.keys(fillLevelTrends)[0]]:", fillLevelTrends[Object.keys(fillLevelTrends)[0]]);
+  console.log("Analytics Data:", analytics);
+  console.log("Collection Efficiency Data:", collectionEfficiencyData);
 
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-8">
@@ -549,10 +551,6 @@ export default function AdminReportsView() {
                         <div className="flex justify-between">
                           <span>Utilization:</span>
                           <span className="font-medium">{data.utilization}%</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Collection Efficiency:</span>
-                          <span className="font-medium">{data.collectionEfficiency}%</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Service Delay:</span>
