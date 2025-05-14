@@ -213,7 +213,7 @@ const ScheduleDetailsDialog = ({
 
   // Field change handlers
   const handleDateChange = (date: Date | null) => {
-    if (date && detailedSchedule._id) {
+    if (date && detailedSchedule._id && detailedSchedule.status === "scheduled") {
       setDetailedSchedule(prev => ({
         ...prev!,
         date: format(date, "yyyy-MM-dd")
@@ -226,7 +226,7 @@ const ScheduleDetailsDialog = ({
   };
 
   const handleStartTimeChange = (time: Date | null) => {
-    if (time && detailedSchedule._id) {
+    if (time && detailedSchedule._id && detailedSchedule.status === "scheduled") {
       setDetailedSchedule(prev => ({
         ...prev!,
         startTime: time.toISOString()
@@ -240,7 +240,7 @@ const ScheduleDetailsDialog = ({
 
   const handleCollectorChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const collectorId = event.target.value;
-    if (detailedSchedule._id) {
+    if (detailedSchedule._id && detailedSchedule.status === "scheduled") {
       // Find the selected collector's full data
       const selectedCollector = collectorId 
         ? collectors.find(c => c._id === collectorId) 
@@ -267,7 +267,7 @@ const ScheduleDetailsDialog = ({
 
   const handleNotesChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const notes = event.target.value;
-    if (detailedSchedule._id) {
+    if (detailedSchedule._id && detailedSchedule.status === "scheduled") {
       setDetailedSchedule(prev => ({
         ...prev!,
         notes
@@ -279,7 +279,7 @@ const ScheduleDetailsDialog = ({
 
   const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const name = event.target.value;
-    if (detailedSchedule._id) {
+    if (detailedSchedule._id && detailedSchedule.status === "scheduled") {
       setDetailedSchedule(prev => ({
         ...prev!,
         name
@@ -299,6 +299,8 @@ const ScheduleDetailsDialog = ({
   };
 
   const handleRouteChange = (newRoute: Array<[number, number]>, distance: number) => {
+    if (detailedSchedule.status !== "scheduled") return;
+    
     setEditedRoute(newRoute);
     
     if (detailedSchedule._id) {
@@ -336,12 +338,18 @@ const ScheduleDetailsDialog = ({
               <input 
                 value={detailedSchedule.name}
                 onChange={handleNameChange}
-                className="text-2xl font-semibold leading-none tracking-tight"
+                className={`text-2xl font-semibold leading-none tracking-tight ${detailedSchedule.status !== 'scheduled' ? 'bg-transparent cursor-not-allowed' : ''}`}
+                disabled={detailedSchedule.status !== 'scheduled'}
               />
               {isSaving && <div className="text-xs text-muted-foreground flex items-center gap-1">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Saving...
               </div>}
+              {detailedSchedule.status !== 'scheduled' && (
+                <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-800 border-amber-200">
+                  Read Only
+                </Badge>
+              )}
             </div>
           </div>
           
@@ -397,7 +405,8 @@ const ScheduleDetailsDialog = ({
                                 type="date"
                                 value={format(new Date(detailedSchedule.date), "yyyy-MM-dd")}
                                 onChange={(e) => handleDateChange(e.target.valueAsDate)}
-                                className="w-full rounded-md border px-2 py-1.5 text-sm"
+                                className={`w-full rounded-md border px-2 py-1.5 text-sm ${detailedSchedule.status !== 'scheduled' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                disabled={detailedSchedule.status !== 'scheduled'}
                               />
                             </div>
                             
@@ -414,7 +423,8 @@ const ScheduleDetailsDialog = ({
                                     handleStartTimeChange(date);
                                   }
                                 }}
-                                className="w-full rounded-md border px-2 py-1.5 text-sm"
+                                className={`w-full rounded-md border px-2 py-1.5 text-sm ${detailedSchedule.status !== 'scheduled' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                disabled={detailedSchedule.status !== 'scheduled'}
                               />
                             </div>
                             
@@ -462,8 +472,9 @@ const ScheduleDetailsDialog = ({
                             <textarea
                               value={detailedSchedule.notes || ''}
                               onChange={handleNotesChange}
-                              className="w-full rounded-md border px-3 py-2 text-sm min-h-[100px]"
+                              className={`w-full rounded-md border px-3 py-2 text-sm min-h-[100px] ${detailedSchedule.status !== 'scheduled' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                               placeholder="Add schedule notes here..."
+                              disabled={detailedSchedule.status !== 'scheduled'}
                             />
                           </div>
                         </CardContent>
